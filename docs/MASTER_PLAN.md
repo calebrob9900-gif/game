@@ -43,9 +43,9 @@ From `research/01` and `research/02`:
   stable as of ~March 2026) credibly reaches **console-quality stylized realism (~late-PS4 era)**
   at 60fps in a tab, but not 1:1 with a native AAA flagship — constrained by ~2–4GB memory
   (far less on iOS), single-threaded JS, and download-size limits.
-- **Out of scope for v1 (deliberate):** scaled server-authoritative multiplayer with anti-cheat.
-  We architect so it can be added later without a rewrite (see `research/08`), but v1 ships
-  single-player.
+- **Out of scope for v1 (deliberate):** real online multiplayer (servers/netcode/matchmaking/
+  anti-cheat). We architect so it can be added later without a rewrite (see `research/08`), but v1
+  ships as the full competitive game played **vs smart bots, offline** (online MP = Phase 8).
 
 We will **not** claim "exact Call of Duty." We *will* produce a measurable, defensible score
 against the headline-shooter rubric and push every winnable category to the top of the web class.

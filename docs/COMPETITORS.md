@@ -14,7 +14,7 @@
 | CS2 | native | Spray patterns/recoil mastery, counter-strafe, penetration |
 | Apex Legends | native | Movement + longer TTK (shield stacks), audio |
 | DOOM Eternal | native | PvE "push-forward" combat pacing |
-| Killing Floor 2 / CoD Zombies | native | Wave-survival design (our mode) |
+| CoD MP (S&D/TDM/Dom) | native | Our exact modes — bot-match feel, spawns, objectives, round flow |
 | **Krunker / Shell Shockers** | **web** | The current **best-web-FPS** ceiling (our nearest real competitors) |
 
 **AAA bar = 5.0**, **Best Web FPS ≈ 3.7** (weighted total). Visual fidelity (criterion 7) is
