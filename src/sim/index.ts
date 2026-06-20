@@ -31,6 +31,8 @@ export type { System } from './core/ecs';
 export { EventBus } from './core/events';
 export { CommandBuffer, foldCommands, emptyTickInput } from './input/commands';
 export type { Command, MoveCommand, LookCommand, FireCommand, TickInput } from './input/commands';
+export { mouseToAngles, cm360, eDPI, SOURCE_YAW_CONST } from './input/sensitivity';
+export type { AngleDelta, SensitivityOptions } from './input/sensitivity';
 export * as vec from './core/vec';
 export type { Vec3 } from './core/vec';
 

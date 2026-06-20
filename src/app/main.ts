@@ -4,6 +4,7 @@ import { createMantleTestLevel } from '../sim/levels/mantleTestLevel';
 import { GameRenderer } from '../presentation/rendering/renderer';
 import { RenderSync } from '../presentation/view/renderSync';
 import { Hud, injectHudStyles } from '../presentation/ui/hud';
+import { PointerLook } from '../presentation/input-capture/pointerLook';
 import { FixedLoop } from './loop';
 import { FrameProbe } from './perf';
 import { installInstrumentation } from './instrumentation';
@@ -83,10 +84,15 @@ async function main(): Promise<void> {
     }),
   });
 
+  // Wire pointer-lock look capture: click canvas → lock, raw mouse → LookCommands.
+  const pointerLook = new PointerLook(canvas, commands, { sens: 2.0 });
+
   await renderer.init();
   probe.backend = renderer.backend;
   renderer.resize();
   globalThis.addEventListener?.('resize', () => renderer.resize());
+  // Expose pointer lock instance for settings (e.g. sensitivity change).
+  (canvas as unknown as { _pointerLook?: PointerLook })._pointerLook = pointerLook;
 
   // First frame, then go live.
   renderSync.apply(renderer, 1);
