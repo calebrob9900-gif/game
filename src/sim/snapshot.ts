@@ -2,6 +2,18 @@ import type { Vec3 } from './core/vec';
 import { getPlayer, type SimWorld } from './world';
 import { EYE_HEIGHT_STAND, EYE_HEIGHT_CROUCH } from './physics/characterController';
 
+// --- bot stub (T-133) ---
+/** Snapshot of a single bot's state (health + alive). */
+export interface BotSnapshot {
+  /** Current health of the bot (0 when dead). */
+  health: number;
+  /** True while the bot is alive (damageable); false when dead, awaiting respawn. */
+  alive: boolean;
+  /** World-space eye position (identical to Entity.position). */
+  position: Vec3;
+}
+// --- end bot stub snapshot ---
+
 /**
  * Immutable read-only projection of sim state for presentation + tests.
  * Presentation reads ONLY this (never the live ECS), preserving the one-way
@@ -65,6 +77,13 @@ export interface PlayerSnapshot {
 export interface Snapshot {
   tick: number;
   player: PlayerSnapshot;
+  // --- bot stub (T-133) ---
+  /**
+   * Snapshot of all bot entities in insertion order.
+   * Empty array when no bots are present (backward-compatible).
+   */
+  bots: BotSnapshot[];
+  // --- end bot stub snapshot ---
 }
 
 export function snapshot(world: SimWorld): Snapshot {
@@ -78,6 +97,20 @@ export function snapshot(world: SimWorld): Snapshot {
   const isMantling = p.isMantling ?? false;
   // Eye height: crouched/sliding/mantling use crouch height, else stand height.
   const eyeHeight = isCrouched || isSliding || isMantling ? EYE_HEIGHT_CROUCH : EYE_HEIGHT_STAND;
+
+  // --- bot stub (T-133) — collect bot snapshots ---
+  const bots: BotSnapshot[] = [];
+  for (const e of world.ecs.entities) {
+    if (!e.bot) continue;
+    if (e.position === undefined) continue;
+    bots.push({
+      health: e.health ?? 0,
+      alive: e.damageable === true,
+      position: { x: e.position.x, y: e.position.y, z: e.position.z },
+    });
+  }
+  // --- end bot stub snapshot ---
+
   return {
     tick: world.tick,
     player: {
@@ -97,5 +130,6 @@ export function snapshot(world: SimWorld): Snapshot {
       isMantling,
       mantleTicksLeft: p.mantleTicksLeft ?? 0,
     },
+    bots,
   };
 }

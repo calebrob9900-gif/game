@@ -14,10 +14,14 @@ export {
   SLIDE_SPEED_MULT,
   SLIDE_TICKS,
   MANTLE_TICKS,
+  // --- bot stub (T-133) ---
+  spawnBot,
+  RESPAWN_TICKS,
+  // --- end bot stub exports ---
 } from './world';
 export type { SimWorld, Entity, SimSettings, GameEvents } from './world';
 export { snapshot } from './snapshot';
-export type { Snapshot, PlayerSnapshot } from './snapshot';
+export type { Snapshot, PlayerSnapshot, BotSnapshot } from './snapshot';
 export { hashWorld } from './core/hash';
 export { DT, TICK_RATE, MAX_FRAME_TIME, decay } from './core/time';
 export { createRng, rngNextU32, rngNextFloat, rngRange, rngInt, cloneRng } from './core/rng';

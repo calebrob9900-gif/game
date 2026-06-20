@@ -21,6 +21,14 @@ import { getWeapon } from './weapons/weapons';
 import { fireHitscan } from './combat/hitscan';
 import type { HitRegion } from './combat/hitbox';
 
+// --- bot stub (T-133) ---
+/**
+ * Respawn delay in ticks after bot death (deterministic, tick-based).
+ * 5 seconds × 60 ticks/s = 300 ticks.
+ */
+export const RESPAWN_TICKS = 5 * TICK_RATE; // 300
+// --- end bot stub constants ---
+
 // ── Re-export crouch/slide/mantle constants so tests can import from sim ───────
 export {
   EYE_HEIGHT_STAND,
@@ -30,6 +38,7 @@ export {
   SLIDE_TICKS,
   MANTLE_TICKS,
 };
+// RESPAWN_TICKS is declared at the top of this file (before the Entity interface).
 
 // ── Sprint constants (research/03 §7.2, §2.2) ─────────────────────────────────
 
@@ -150,6 +159,30 @@ export interface Entity {
    * Mantle forward direction Z component (normalized world space).
    */
   mantleDirZ?: number;
+
+  // --- bot stub (T-133) ---
+  /**
+   * Marks this entity as a bot placeholder target.
+   * Absent ⇒ not a bot. Does NOT conflict with the player flag.
+   */
+  bot?: true;
+  /**
+   * Maximum health for this entity (used to restore health on respawn).
+   * Absent ⇒ defaults to 100 if the entity is a bot.
+   */
+  maxHealth?: number;
+  /**
+   * Tick number at which this bot should respawn (if dead).
+   * Only meaningful when health ≤ 0 (dead state).
+   * 0 or absent ⇒ no pending respawn.
+   */
+  respawnAtTick?: number;
+  /**
+   * Spawn position for this bot (foot position in world space).
+   * Stored so the bot can respawn at the same location.
+   */
+  spawnPos?: Vec3;
+  // --- end bot stub fields ---
 }
 
 export interface SimSettings {
@@ -236,6 +269,35 @@ export function createWorld(
     level,
   };
 }
+
+// --- bot stub (T-133) ---
+/**
+ * Spawn a bot placeholder target at `footPos` (foot position in world space).
+ *
+ * The bot entity has:
+ *   - `bot: true` — marks it as a bot
+ *   - `health: maxHealth` — full health at spawn
+ *   - `maxHealth` — stored for respawn restoration
+ *   - `damageable: true` — valid hitscan target
+ *   - `position` — eye position (footPos.y + EYE_HEIGHT_STAND)
+ *   - `spawnPos` — stored foot position for respawn
+ *
+ * Does NOT alter default createWorld behaviour; call this after createWorld.
+ * Returns the spawned entity.
+ */
+export function spawnBot(world: SimWorld, footPos: Vec3, maxHealth = 100): Entity {
+  const entity: Entity = {
+    bot: true,
+    health: maxHealth,
+    maxHealth,
+    damageable: true,
+    position: vec3(footPos.x, footPos.y + EYE_HEIGHT_STAND, footPos.z),
+    spawnPos: vec3(footPos.x, footPos.y, footPos.z),
+  };
+  world.ecs.add(entity);
+  return entity;
+}
+// --- end bot stub factory ---
 
 export function getPlayer(
   world: SimWorld,
@@ -590,6 +652,46 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
     }
   }
   // --- end combat/fire -------------------------------------------------------
+
+  // --- bot stub (T-133) — death + respawn ------------------------------------
+  // Process all bot entities:
+  //   1. When health drops to ≤ 0 (just died): mark respawnAtTick and remove
+  //      from the damageable set (health stays 0, damageable cleared).
+  //   2. When respawnAtTick arrives: restore full health, set damageable=true,
+  //      return position to spawnPos. Deterministic tick-based (no random).
+  //
+  // NOTE: world.tick has NOT yet incremented at this point.
+  // The comparison uses world.tick + 1 (the tick we are completing).
+  const currentTickAfterIncrement = world.tick + 1;
+  for (const e of world.ecs.entities) {
+    if (!e.bot) continue;
+
+    if (e.health !== undefined && e.health <= 0 && e.damageable) {
+      // Bot just died (health reached 0 this tick or was 0 and still damageable).
+      // Mark dead: clear damageable so hitscan skips it.
+      e.damageable = false;
+      // Schedule respawn after RESPAWN_TICKS from the next tick.
+      e.respawnAtTick = currentTickAfterIncrement + RESPAWN_TICKS;
+    } else if (
+      !e.damageable &&
+      e.respawnAtTick !== undefined &&
+      e.respawnAtTick > 0 &&
+      currentTickAfterIncrement >= e.respawnAtTick
+    ) {
+      // Respawn: restore health and position, mark damageable again.
+      const max = e.maxHealth ?? 100;
+      e.health = max;
+      e.damageable = true;
+      e.respawnAtTick = 0;
+      // Return to spawn position.
+      if (e.spawnPos && e.position) {
+        e.position.x = e.spawnPos.x;
+        e.position.y = e.spawnPos.y + EYE_HEIGHT_STAND;
+        e.position.z = e.spawnPos.z;
+      }
+    }
+  }
+  // --- end bot stub (T-133) --------------------------------------------------
 
   world.tick += 1;
   world.events.emit('tick', { tick: world.tick });
