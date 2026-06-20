@@ -1,6 +1,7 @@
 import { CommandBuffer, createWorld, snapshot, step, type Command, type SimWorld } from '../sim';
 import { GameRenderer } from '../presentation/rendering/renderer';
 import { RenderSync } from '../presentation/view/renderSync';
+import { Hud, injectHudStyles } from '../presentation/ui/hud';
 import { FixedLoop } from './loop';
 import { FrameProbe } from './perf';
 import { installInstrumentation } from './instrumentation';
@@ -26,6 +27,10 @@ async function main(): Promise<void> {
   const probe = new FrameProbe();
   const renderer = new GameRenderer(canvas);
 
+  // HUD overlay — lives in DOM outside #game canvas so V4 visual baseline is unaffected.
+  injectHudStyles();
+  const hud = new Hud(document.body);
+
   renderSync.push(snapshot(world));
 
   const stepSim = (): void => {
@@ -38,6 +43,8 @@ async function main(): Promise<void> {
     render: (alpha) => {
       renderSync.apply(renderer, alpha);
       renderer.render();
+      // Update HUD from the current sim snapshot (DOM writes only when values change).
+      hud.update(snapshot(world));
     },
     onFrame: (now) => probe.record(now),
   });
@@ -74,6 +81,7 @@ async function main(): Promise<void> {
   // First frame, then go live.
   renderSync.apply(renderer, 1);
   renderer.render();
+  hud.update(snapshot(world));
   loop.start();
 
   document.getElementById('boot')?.classList.add('hidden');
