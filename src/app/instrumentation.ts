@@ -1,0 +1,41 @@
+import type { Command, Snapshot } from '../sim';
+import type { PerfStats } from './perf';
+
+/**
+ * Test-instrumentation contract (docs/ARCHITECTURE.md §6). Present in dev/test
+ * builds only — gated on import.meta.env.DEV so a production `vite build` tree-
+ * shakes it out. Lets Playwright (V3/V4/V5) observe and drive the game
+ * deterministically without reading pixels.
+ */
+export interface Instrumentation {
+  getSnapshot(): Snapshot;
+  pushCommand(cmd: Command): void;
+  stepTo(tick: number): Snapshot;
+  perf(): { sample: (ms?: number) => PerfStats; stats: () => PerfStats };
+}
+
+declare global {
+  interface Window {
+    __GAME_READY__?: boolean;
+    __GAME_STATE__?: () => Snapshot;
+    __perf?: { sample: (ms?: number) => PerfStats; stats: () => PerfStats };
+    __pushCommand?: (cmd: Command) => void;
+    __stepTo?: (tick: number) => Snapshot;
+  }
+}
+
+/** Returns a `markReady` setter the bootstrap calls once the first frame renders. */
+export function installInstrumentation(api: Instrumentation): (ready: boolean) => void {
+  if (!import.meta.env.DEV) {
+    return () => {};
+  }
+  const w = window;
+  w.__GAME_READY__ = false;
+  w.__GAME_STATE__ = () => api.getSnapshot();
+  w.__pushCommand = (cmd: Command) => api.pushCommand(cmd);
+  w.__stepTo = (tick: number) => api.stepTo(tick);
+  w.__perf = api.perf();
+  return (ready: boolean) => {
+    w.__GAME_READY__ = ready;
+  };
+}

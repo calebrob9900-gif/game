@@ -1,0 +1,15 @@
+{
+  "$comment": "Lighthouse CI config (V5 load budgets). Wired for CI/GPU runners; local verify.sh uses scripts/perf.mjs because the Lighthouse Chrome download CDN is blocked in the sandbox.",
+  "ci": {
+    "collect": {
+      "staticDistDir": "./dist",
+      "numberOfRuns": 1
+    },
+    "assert": {
+      "assertions": {
+        "resource-summary:script:size": ["warn", { "maxNumericValue": 4000000 }],
+        "resource-summary:total:size": ["warn", { "maxNumericValue": 8000000 }]
+      }
+    }
+  }
+}

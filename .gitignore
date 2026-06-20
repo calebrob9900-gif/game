@@ -1,0 +1,16 @@
+node_modules/
+dist/
+coverage/
+*.log
+.DS_Store
+
+# test artifacts
+playwright-report/
+test-results/
+blob-report/
+.cache/
+.lighthouseci/
+
+# vite
+*.local
+.vite/

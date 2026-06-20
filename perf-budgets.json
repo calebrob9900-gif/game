@@ -1,0 +1,28 @@
+{
+  "$comment": "V5 performance budgets (docs/VERIFICATION.md §7). 'frame'/'drawCalls' are the desktop-GPU targets; 'ci' is the looser bound used on Linux SwiftShader software rendering (relative-regression signal, NOT GPU-representative).",
+  "frame": {
+    "targetFps": 60,
+    "maxP95FrameMs": 16.6,
+    "minSustainedFps": 50
+  },
+  "ci": {
+    "minRenderFrames": 5,
+    "minAvgFps": 3,
+    "maxP95FrameMs": 900,
+    "simBatchTicks": 600,
+    "maxSimBatchMs": 300,
+    "note": "Linux headless SwiftShader: absolute GPU FPS is NOT representative (VERIFICATION.md §2). We gate the GPU-independent signals — bundle budget, sim-step CPU throughput, render-loop liveness — and only REPORT software FPS. The 60fps/16.6ms target under 'frame' is for GPU runners."
+  },
+  "drawCalls": {
+    "maxTypical": 100
+  },
+  "load": {
+    "maxInitialJsKb": 1900,
+    "maxTotalJsKb": 4000,
+    "maxTotalKb": 8000
+  },
+  "memory": {
+    "soakMinutes": 5,
+    "maxGrowthMb": 50
+  }
+}

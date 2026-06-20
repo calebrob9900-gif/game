@@ -1,0 +1,24 @@
+node_modules/
+dist/
+coverage/
+playwright-report/
+test-results/
+blob-report/
+pnpm-lock.yaml
+package-lock.json
+**/*-snapshots/**
+
+# Markdown docs are authored by hand; don't reflow them.
+*.md
+
+# Legacy prototype files (predate the NEON BREACH scaffold).
+arcade.html
+shooter.html
+play.html
+legacy.html
+engine.js
+styles.css
+games/
+public/
+.claude/
+.nojekyll

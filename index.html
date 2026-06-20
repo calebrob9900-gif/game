@@ -1,54 +1,45 @@
 <!doctype html>
 <html lang="en">
-<head>
-  <meta charset="utf-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Game Lab — 5 Playable Prototypes</title>
-  <link rel="stylesheet" href="styles.css" />
-</head>
-<body>
-  <div class="hub">
-    <h1>🎮 Game Lab</h1>
-    <p class="sub">Five rough-draft prototypes — built with Three.js. Play each, then pick your favorite to take all the way.</p>
-
-    <div class="grid">
-      <a class="card" href="games/driving.html">
-        <div class="emoji">🏎️</div>
-        <h2>Driving + Stunt</h2>
-        <p>Arcade car physics with drifting, big jump ramps, flips and an airtime score. Switch to a dirt bike with one key.</p>
-        <span class="tag">Play ▸</span>
-      </a>
-
-      <a class="card" href="games/fps.html">
-        <div class="emoji">🔫</div>
-        <h2>Arcade FPS Shooter</h2>
-        <p>Mouse-look + WASD in a neon arena. Click to shoot the moving targets before the timer runs out. Combo your hits.</p>
-        <span class="tag">Play ▸</span>
-      </a>
-
-      <a class="card" href="games/motocross.html">
-        <div class="emoji">🏍️</div>
-        <h2>Motocross / Dirt Bike</h2>
-        <p>Ride a dirt bike over rolling hills and tabletop jumps. Lean for balance, pull air tricks, stick the landing.</p>
-        <span class="tag">Play ▸</span>
-      </a>
-
-      <a class="card" href="games/skyracer.html">
-        <div class="emoji">✈️</div>
-        <h2>Sky Racer</h2>
-        <p>Bank and dive a jet through a course of glowing rings over open terrain. Beat the clock, chain the gates.</p>
-        <span class="tag">Play ▸</span>
-      </a>
-
-      <a class="card" href="games/jetski.html">
-        <div class="emoji">🌊</div>
-        <h2>Jet-Ski Wave Rider</h2>
-        <p>Carve across a living ocean, launch off wave-ramps for big air, and slalom through the buoy gates.</p>
-        <span class="tag">Play ▸</span>
-      </a>
-    </div>
-
-    <footer>Keyboard + mouse · No install · Works in any modern browser</footer>
-  </div>
-</body>
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>NEON BREACH</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+      html,
+      body {
+        margin: 0;
+        height: 100%;
+        overflow: hidden;
+        background: #05060a;
+        font-family: system-ui, sans-serif;
+      }
+      #game {
+        display: block;
+        width: 100vw;
+        height: 100vh;
+      }
+      #boot {
+        position: fixed;
+        inset: 0;
+        display: grid;
+        place-content: center;
+        color: #38e1ff;
+        letter-spacing: 0.3em;
+        text-transform: uppercase;
+        pointer-events: none;
+        transition: opacity 0.4s ease;
+      }
+      #boot.hidden {
+        opacity: 0;
+      }
+    </style>
+  </head>
+  <body>
+    <canvas id="game"></canvas>
+    <div id="boot">NEON BREACH</div>
+    <script type="module" src="/src/app/main.ts"></script>
+  </body>
 </html>
