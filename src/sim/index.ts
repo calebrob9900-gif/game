@@ -11,6 +11,9 @@ export {
   EYE_HEIGHT_STAND,
   EYE_HEIGHT_CROUCH,
   CROUCH_SPEED_MULT,
+  SLIDE_SPEED_MULT,
+  SLIDE_TICKS,
+  MANTLE_TICKS,
 } from './world';
 export type { SimWorld, Entity, SimSettings, GameEvents } from './world';
 export { snapshot } from './snapshot';
@@ -31,17 +34,23 @@ export type { Vec3 } from './core/vec';
 export type { LevelDescriptor, BoxCollider, SpawnPoint } from './levels/levelDescriptor';
 export { validateLevel } from './levels/levelDescriptor';
 export { createTestLevel } from './levels/testLevel';
+export { createMantleTestLevel } from './levels/mantleTestLevel';
 export { parseLevel } from './levels/loadLevel';
 
 // Physics / character controller
 export {
   moveAndResolve,
   integratePlayer,
+  detectMantle,
   resolveCapsuleVsBox,
   hasHeadroomToStand,
   PLAYER_CAPSULE,
   PLAYER_CAPSULE_CROUCHED,
   STEP_HEIGHT,
+  MAX_MANTLE_HEIGHT,
+  SLIDE_SPEED_MULT as CONTROLLER_SLIDE_SPEED_MULT,
+  SLIDE_TICKS as CONTROLLER_SLIDE_TICKS,
+  MANTLE_TICKS as CONTROLLER_MANTLE_TICKS,
   DEFAULT_MOVEMENT_PARAMS,
 } from './physics/characterController';
 export type {

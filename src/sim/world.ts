@@ -7,15 +7,26 @@ import { foldCommands, type Command } from './input/commands';
 import type { LevelDescriptor } from './levels/levelDescriptor';
 import {
   integratePlayer,
+  detectMantle,
   EYE_HEIGHT_STAND,
   EYE_HEIGHT_CROUCH,
   CROUCH_SPEED_MULT,
+  SLIDE_SPEED_MULT,
+  SLIDE_TICKS,
+  MANTLE_TICKS,
   type ControllerState,
   type PlayerMovementParams,
 } from './physics/characterController';
 
-// ── Re-export crouch constants so tests can import them from sim ───────────────
-export { EYE_HEIGHT_STAND, EYE_HEIGHT_CROUCH, CROUCH_SPEED_MULT };
+// ── Re-export crouch/slide/mantle constants so tests can import from sim ───────
+export {
+  EYE_HEIGHT_STAND,
+  EYE_HEIGHT_CROUCH,
+  CROUCH_SPEED_MULT,
+  SLIDE_SPEED_MULT,
+  SLIDE_TICKS,
+  MANTLE_TICKS,
+};
 
 // ── Sprint constants (research/03 §7.2, §2.2) ─────────────────────────────────
 
@@ -85,6 +96,44 @@ export interface Entity {
    * From research/03 §7.3.
    */
   isCrouched?: boolean;
+  // ── Slide state (T-105, research/03 §7.3) ────────────────────────────────────
+  /**
+   * Whether the player is currently sliding.
+   * True during the slide boost window (slideTicksLeft > 0).
+   * Absent ⇒ not sliding (default). Only set when slide input is first received.
+   */
+  isSliding?: boolean;
+  /**
+   * Remaining ticks in the slide boost window (counts down from SLIDE_TICKS to 0).
+   * Absent or 0 ⇒ not sliding. Slide triggered by sprint+crouch on ground.
+   */
+  slideTicksLeft?: number;
+  // ── Mantle state (T-105, research/03 §7.3) ───────────────────────────────────
+  /**
+   * Whether the player is currently mantling a ledge.
+   * True while mantleTicksLeft > 0.
+   * Absent ⇒ not mantling (default).
+   */
+  isMantling?: boolean;
+  /**
+   * Remaining ticks in the mantle animation (counts down from MANTLE_TICKS to 0).
+   * Absent or 0 ⇒ not mantling.
+   */
+  mantleTicksLeft?: number;
+  /**
+   * Target foot Y to mantle to (the ledge top surface Y).
+   * Only meaningful when mantleTicksLeft > 0.
+   */
+  mantleTargetY?: number;
+  /**
+   * Mantle forward direction X component (normalized world space).
+   * Set when mantle is triggered, cleared when done.
+   */
+  mantleDirX?: number;
+  /**
+   * Mantle forward direction Z component (normalized world space).
+   */
+  mantleDirZ?: number;
 }
 
 export interface SimSettings {
@@ -256,13 +305,85 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
     // ── Capsule controller path ──────────────────────────────────────────────
     // Player position stores the EYE position. We convert to foot position for
     // the physics controller (foot = eye - eyeHeight). Eye height depends on crouch state.
-    const currentEyeHeight = wasCrouched ? EYE_HEIGHT_CROUCH : EYE_HEIGHT_STAND;
+    // During slide or mantle, use crouch eye height.
+    const wasSliding = (p.slideTicksLeft ?? 0) > 0;
+    const wasMantling = (p.mantleTicksLeft ?? 0) > 0;
+    const currentEyeHeight =
+      wasCrouched || wasSliding || wasMantling ? EYE_HEIGHT_CROUCH : EYE_HEIGHT_STAND;
     const footY = p.position.y - currentEyeHeight;
     const ctrlState: ControllerState = {
       position: { x: p.position.x, y: footY, z: p.position.z },
       velocity: { x: p.velocity.x, y: p.velocity.y, z: p.velocity.z },
       onGround: p.onGround ?? false,
     };
+
+    // ── Slide state management (T-105) ───────────────────────────────────────
+    // Slide is triggered when: sprint is active + crouch input pressed + on ground + moving.
+    // The slide gives a speed boost of SLIDE_SPEED_MULT × maxRunSpeed for SLIDE_TICKS ticks.
+    // Slide takes priority over normal sprint+crouch (crouch cancels sprint in normal cases,
+    // but slide is a special transition from sprint into crouch).
+    let slideTicksLeft = p.slideTicksLeft ?? 0;
+    const hasHorizMove = wishX !== 0 || wishZ !== 0;
+    const canStartSlide =
+      (activeSprint || wasSprintingBefore) && // was or is sprinting
+      crouchInput && // crouch key pressed
+      ctrlState.onGround && // on the ground
+      !wasMantling && // not already mantling
+      slideTicksLeft === 0; // not already sliding
+
+    if (canStartSlide && hasHorizMove) {
+      // Trigger slide: set velocity to SLIDE_SPEED_MULT × run speed in current wish direction
+      slideTicksLeft = SLIDE_TICKS;
+      // Slide boosts velocity in the current wish direction (or current velocity direction
+      // if no wish input). Use wish direction if present, else existing velocity direction.
+      const slideSpeed = s.moveSpeed * (p.moveMult ?? 1.0) * SLIDE_SPEED_MULT;
+      const velLen = Math.sqrt(
+        ctrlState.velocity.x * ctrlState.velocity.x + ctrlState.velocity.z * ctrlState.velocity.z,
+      );
+      if (wishX !== 0 || wishZ !== 0) {
+        const wl = Math.sqrt(wishX * wishX + wishZ * wishZ);
+        ctrlState.velocity.x = (wishX / wl) * slideSpeed;
+        ctrlState.velocity.z = (wishZ / wl) * slideSpeed;
+      } else if (velLen > 0.01) {
+        ctrlState.velocity.x = (ctrlState.velocity.x / velLen) * slideSpeed;
+        ctrlState.velocity.z = (ctrlState.velocity.z / velLen) * slideSpeed;
+      }
+    } else if (slideTicksLeft > 0) {
+      slideTicksLeft -= 1;
+    }
+
+    const isSliding = slideTicksLeft > 0;
+
+    // ── Mantle detection (T-105) ─────────────────────────────────────────────
+    // Auto-mantle: when player is on ground and moving into a wall with top
+    // > STEP_HEIGHT and ≤ MAX_MANTLE_HEIGHT, and there is clearance above.
+    // Mantle cannot start while sliding or already mantling.
+    let mantleTicksLeft = p.mantleTicksLeft ?? 0;
+    let mantleTargetY = p.mantleTargetY ?? 0;
+    let mantleDirX = p.mantleDirX ?? 0;
+    let mantleDirZ = p.mantleDirZ ?? 0;
+
+    if (!isSliding && !wasMantling && ctrlState.onGround && hasHorizMove) {
+      // Only probe for mantle when moving (not standing still)
+      const mantle = detectMantle(
+        ctrlState.position.x,
+        ctrlState.position.y,
+        ctrlState.position.z,
+        wishX,
+        wishZ,
+        world.level.colliders,
+      );
+      if (mantle) {
+        mantleTicksLeft = MANTLE_TICKS;
+        mantleTargetY = mantle.targetY;
+        mantleDirX = mantle.dirX;
+        mantleDirZ = mantle.dirZ;
+      }
+    } else if (wasMantling && mantleTicksLeft > 0) {
+      mantleTicksLeft -= 1;
+    }
+
+    const isMantlingNow = mantleTicksLeft > 0;
 
     const movParams: PlayerMovementParams = {
       maxRunSpeed: s.moveSpeed,
@@ -277,10 +398,14 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
       // Omitting when false preserves default behaviour.
       crouchInput,
       wasCrouched,
+      // Slide params (T-105) — only passed when slide is relevant.
+      ...(isSliding || wasSliding ? { slideTicksLeft } : {}),
+      // Mantle params (T-105) — only passed when mantling.
+      ...(isMantlingNow ? { mantleTicksLeft, mantleTargetY, mantleDirX, mantleDirZ } : {}),
     };
 
     // Fire jump event BEFORE integration (so listener sees the world state)
-    if (input.jump && ctrlState.onGround) {
+    if (input.jump && ctrlState.onGround && !isSliding && !isMantlingNow) {
       world.events.emit('jump', { tick: world.tick });
     }
 
@@ -295,8 +420,10 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
     );
 
     // Write back to entity.
-    // Eye height is now determined by the post-integration crouch state.
-    const newEyeHeight = nowCrouched ? EYE_HEIGHT_CROUCH : EYE_HEIGHT_STAND;
+    // Eye height: crouched, sliding, or mantling → EYE_HEIGHT_CROUCH; else STAND.
+    const nowSliding = isSliding;
+    const newEyeHeight =
+      nowCrouched || nowSliding || isMantlingNow ? EYE_HEIGHT_CROUCH : EYE_HEIGHT_STAND;
     p.position.x = ctrlState.position.x;
     p.position.y = ctrlState.position.y + newEyeHeight;
     p.position.z = ctrlState.position.z;
@@ -308,8 +435,25 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
     // Only store isCrouched on entity when crouch has been used (to preserve
     // existing golden hashes for scenarios without any crouch input — hash only
     // folds isCrouched when the field is defined, matching the sprint pattern).
-    if (crouchInput || wasCrouched) {
-      p.isCrouched = nowCrouched;
+    if (crouchInput || wasCrouched || isSliding || wasSliding) {
+      p.isCrouched = nowCrouched || nowSliding; // slide keeps crouched posture
+    }
+
+    // ── Persist slide state (T-105) ──────────────────────────────────────────
+    // Only set on entity when slide has been used, to preserve existing golden hashes.
+    if (isSliding || wasSliding || canStartSlide) {
+      p.isSliding = nowSliding;
+      p.slideTicksLeft = slideTicksLeft;
+    }
+
+    // ── Persist mantle state (T-105) ─────────────────────────────────────────
+    // Only set on entity when mantle has been used, to preserve existing golden hashes.
+    if (isMantlingNow || wasMantling) {
+      p.isMantling = isMantlingNow;
+      p.mantleTicksLeft = mantleTicksLeft;
+      p.mantleTargetY = mantleTargetY;
+      p.mantleDirX = mantleDirX;
+      p.mantleDirZ = mantleDirZ;
     }
   } else {
     // ── Flat-ground fallback path (no level loaded) ──────────────────────────

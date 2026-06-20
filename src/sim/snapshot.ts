@@ -42,6 +42,24 @@ export interface PlayerSnapshot {
    * Presentation uses this to position the camera.
    */
   eyeHeight: number;
+  /**
+   * Whether the player is currently sliding (T-105).
+   * True during the slide boost window (slideTicksLeft > 0). False otherwise.
+   */
+  isSliding: boolean;
+  /**
+   * Remaining slide boost ticks (T-105). 0 when not sliding.
+   */
+  slideTicksLeft: number;
+  /**
+   * Whether the player is currently mantling a ledge (T-105).
+   * True while mantleTicksLeft > 0. False otherwise.
+   */
+  isMantling: boolean;
+  /**
+   * Remaining mantle ticks (T-105). 0 when not mantling.
+   */
+  mantleTicksLeft: number;
 }
 
 export interface Snapshot {
@@ -56,7 +74,10 @@ export function snapshot(world: SimWorld): Snapshot {
   // canFire is false while sprinting OR while the sprint-out window is active.
   const canFire = !isSprinting && world.tick >= sprintOutUntilTick;
   const isCrouched = p.isCrouched ?? false;
-  const eyeHeight = isCrouched ? EYE_HEIGHT_CROUCH : EYE_HEIGHT_STAND;
+  const isSliding = p.isSliding ?? false;
+  const isMantling = p.isMantling ?? false;
+  // Eye height: crouched/sliding/mantling use crouch height, else stand height.
+  const eyeHeight = isCrouched || isSliding || isMantling ? EYE_HEIGHT_CROUCH : EYE_HEIGHT_STAND;
   return {
     tick: world.tick,
     player: {
@@ -71,6 +92,10 @@ export function snapshot(world: SimWorld): Snapshot {
       canFire,
       isCrouched,
       eyeHeight,
+      isSliding,
+      slideTicksLeft: p.slideTicksLeft ?? 0,
+      isMantling,
+      mantleTicksLeft: p.mantleTicksLeft ?? 0,
     },
   };
 }

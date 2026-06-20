@@ -63,6 +63,13 @@ function foldEntity(h: number, e: Entity): number {
   // Crouch state — only hashed when present (same pattern as sprint fields above),
   // so scenarios with no crouch input produce identical hashes to pre-T-104.
   if (e.isCrouched !== undefined) h = foldStr(h, e.isCrouched ? 'C' : 'c');
+  // Slide state (T-105) — only hashed when present so existing goldens are unchanged.
+  if (e.isSliding !== undefined) h = foldStr(h, e.isSliding ? 'SL' : 'sl');
+  if (e.slideTicksLeft !== undefined && e.slideTicksLeft > 0) h = foldNumber(h, e.slideTicksLeft);
+  // Mantle state (T-105) — only hashed when present.
+  if (e.isMantling !== undefined) h = foldStr(h, e.isMantling ? 'ML' : 'ml');
+  if (e.mantleTicksLeft !== undefined && e.mantleTicksLeft > 0)
+    h = foldNumber(h, e.mantleTicksLeft);
   return h;
 }
 

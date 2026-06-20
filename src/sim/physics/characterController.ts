@@ -6,6 +6,8 @@
  *   - Horizontal wall slide (reflect velocity along surface normal, don't stick)
  *   - Step-up for small ledges (stepHeight)
  *   - Ground snap (onGround detection, gravity)
+ *   - Slide (sprint+crouch boost, T-105)
+ *   - Vault/Mantle (auto-climb ledges > stepHeight, ≤ maxMantleHeight, T-105)
  *   - Frame-rate-independent via fixed DT
  *
  * No `three`, no DOM, no WASM. Pure deterministic math.
@@ -75,6 +77,42 @@ export const CROUCH_SPEED_MULT = 0.45;
  * From research/03 §7.3: mantle/vault maxHeight ~1.0–1.3 m; step is smaller.
  */
 export const STEP_HEIGHT = 0.4;
+
+// ── Slide constants (T-105, research/03 §7.3) ─────────────────────────────────
+
+/**
+ * Slide speed multiplier relative to run speed at boost peak.
+ * From research/03 §7.3: ~1.3–1.6×. Chosen 1.4× (matches sprint, gives noticeable boost).
+ */
+export const SLIDE_SPEED_MULT = 1.4;
+
+/**
+ * Slide boost duration in ticks (fixed 60 Hz).
+ * From research/03 §7.3: ~0.4–0.7 s. Chosen 0.5 s → 30 ticks.
+ */
+export const SLIDE_TICKS = 30; // 0.5 s at 60 Hz
+
+/**
+ * Slide friction — lower than ground friction so momentum carries.
+ * Value: 2.0 /s (vs ground friction 8/s), exponential decay.
+ * After boost window, decelerates to crouch speed.
+ */
+export const SLIDE_FRICTION = 2.0;
+
+// ── Mantle/vault constants (T-105, research/03 §7.3) ─────────────────────────
+
+/**
+ * Maximum ledge top height the player can vault/mantle over (m).
+ * From research/03 §7.3: ~1.0–1.3 m. Chosen 1.3 m.
+ * Anything > STEP_HEIGHT (0.4 m) and ≤ MAX_MANTLE_HEIGHT triggers mantle.
+ */
+export const MAX_MANTLE_HEIGHT = 1.3;
+
+/**
+ * Mantle duration in ticks. Player moves from current foot Y to ledge top over this window.
+ * From research/03 §7.3: ~0.3–0.5 s. Chosen 0.35 s → 21 ticks.
+ */
+export const MANTLE_TICKS = 21; // ~0.35 s at 60 Hz
 
 /**
  * Skin offset: a small gap kept between the capsule and surfaces to prevent
@@ -350,6 +388,34 @@ export interface PlayerMovementParams {
    * Omit or false for standing (default).
    */
   wasCrouched?: boolean;
+  // ── Slide params (T-105) ─────────────────────────────────────────────────────
+  /**
+   * Remaining slide ticks on entry to this tick.
+   * >0 means the player is in the slide boost window. Omit or 0 = not sliding.
+   * Set by world.ts from entity.slideTicksLeft. From research/03 §7.3.
+   */
+  slideTicksLeft?: number;
+  // ── Mantle params (T-105) ────────────────────────────────────────────────────
+  /**
+   * Remaining mantle ticks on entry to this tick.
+   * >0 means the player is actively mantling. Omit or 0 = not mantling.
+   * Set by world.ts from entity.mantleTicksLeft.
+   */
+  mantleTicksLeft?: number;
+  /**
+   * Target foot Y to mantle to (top of the ledge).
+   * Only meaningful when mantleTicksLeft > 0.
+   */
+  mantleTargetY?: number;
+  /**
+   * Mantle horizontal direction (world X). Push player over the ledge.
+   * Must be a unit vector component. Set by world.ts.
+   */
+  mantleDirX?: number;
+  /**
+   * Mantle horizontal direction (world Z). Push player over the ledge.
+   */
+  mantleDirZ?: number;
 }
 
 export const DEFAULT_MOVEMENT_PARAMS: PlayerMovementParams = {
@@ -385,7 +451,8 @@ export function hasHeadroomToStand(
 /**
  * Integrate player movement for one fixed tick (dt).
  *
- * Applies friction, acceleration, gravity, jump, crouch, then calls moveAndResolve.
+ * Applies friction, acceleration, gravity, jump, crouch, slide, mantle,
+ * then calls moveAndResolve.
  * Frame-rate-independent: friction uses `1 - exp(-lambda*dt)`, accel is
  * clamped by `min(1, accel*dt)`.
  *
@@ -395,6 +462,17 @@ export function hasHeadroomToStand(
  *   - Speed is multiplied by CROUCH_SPEED_MULT (0.45) on top of moveMult.
  *   - The crouched capsule (PLAYER_CAPSULE_CROUCHED) is used for collision.
  *   - When uncouching: check headroom; if blocked above, stay crouched.
+ *
+ * Slide logic (T-105, research/03 §7.3):
+ *   - Triggered by sprint+crouch on ground (handled in world.ts).
+ *   - params.slideTicksLeft > 0 means we're in the slide boost window.
+ *   - While sliding: use slide friction (low), no accel toward new wish, use
+ *     crouch capsule/eye height. Boost speed is set at slide start by world.ts.
+ *
+ * Mantle logic (T-105, research/03 §7.3):
+ *   - params.mantleTicksLeft > 0 means player is actively mantling a ledge.
+ *   - During mantle: player is moved upward + forward toward mantleTargetY.
+ *   - Gravity and normal collision are overridden during mantle.
  *
  * @param state     Mutable controller state (position, velocity, onGround)
  * @param wishX     Desired movement direction X (world space, normalized)
@@ -420,9 +498,52 @@ export function integratePlayer(
   const crouchInput = params.crouchInput ?? false;
   const wasCrouched = params.wasCrouched ?? false;
 
+  // ── Mantle override path (T-105) ─────────────────────────────────────────────
+  // While mantling, we interpolate foot Y toward the ledge top and push forward.
+  // Normal physics (friction/accel/gravity/crouch) are bypassed for this tick.
+  const mantleTicksLeft = params.mantleTicksLeft ?? 0;
+  if (mantleTicksLeft > 0) {
+    const mantleTargetY = params.mantleTargetY ?? state.position.y;
+    const dirX = params.mantleDirX ?? 0;
+    const dirZ = params.mantleDirZ ?? 0;
+
+    // Move upward toward target by fraction of remaining distance this tick.
+    // Use linear interpolation: step = (targetY - currentY) / mantleTicksLeft
+    // This distributes the vertical movement evenly across all mantle ticks.
+    const vertStep = (mantleTargetY - state.position.y) / mantleTicksLeft;
+
+    // Horizontal push: move at a constant fraction of run speed over the ledge.
+    // 0.5× run speed gives a smooth vault feel without overshooting.
+    const horizSpeed = params.maxRunSpeed * 0.5;
+
+    const delta = {
+      x: dirX * horizSpeed * dt,
+      y: vertStep,
+      z: dirZ * horizSpeed * dt,
+    };
+
+    // During mantle, zero out velocity to prevent residual motion interference.
+    vel.x = dirX * horizSpeed;
+    vel.y = 0;
+    vel.z = dirZ * horizSpeed;
+
+    // Apply movement (no resolving against step-up since we're climbing intentionally).
+    // Use a simple translate + resolve pass with the crouch capsule (compact during mantle).
+    state.position.x += delta.x;
+    state.position.y += delta.y;
+    state.position.z += delta.z;
+
+    // Resolve horizontal collisions but NOT step-up (we handle vertical ourselves).
+    moveAndResolve(state, { x: 0, y: 0, z: 0 }, colliders, PLAYER_CAPSULE_CROUCHED, 0);
+
+    state.onGround = false; // airborne while climbing
+    return true; // stay crouched during mantle
+  }
+
   // --- Determine crouch state for this tick ---
   // Crouch is active when: crouchInput held AND onGround.
   // When crouchInput is released: attempt to stand; stay crouched if blocked above.
+  // Slide also forces crouch (handled in world.ts; slideTicksLeft > 0 implies crouched).
   let isCrouched: boolean;
   if (crouchInput && state.onGround) {
     // Want to crouch and on ground → crouch.
@@ -443,44 +564,69 @@ export function integratePlayer(
     isCrouched = false;
   }
 
+  // Sliding forces the crouched posture even if crouchInput is not pressed.
+  const slideTicksLeft = params.slideTicksLeft ?? 0;
+  const isSliding = slideTicksLeft > 0;
+  if (isSliding) isCrouched = true;
+
   // Select effective capsule based on crouch state (or use override if provided).
   const effectiveCapsule = capsule ?? (isCrouched ? PLAYER_CAPSULE_CROUCHED : PLAYER_CAPSULE);
 
-  // --- Friction (horizontal) — frame-rate-independent exponential decay ---
-  // Applied EVERY grounded tick, independent of wish input. While a key is held,
-  // the high-accel step below restores the target speed; when input is released
-  // OR reversed, this friction decays the carried velocity within a few ticks —
-  // that is the counter-strafe brake (research/03 §7.1).
-  const horizSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
-  if (horizSpeed > 0 && state.onGround) {
-    // decay factor: 1 - exp(-friction * dt)
-    const frictionFactor = 1 - Math.exp(-params.friction * dt);
-    const newSpeed = Math.max(0, horizSpeed - horizSpeed * frictionFactor);
-    const scale = horizSpeed > 0 ? newSpeed / horizSpeed : 0;
-    vel.x *= scale;
-    vel.z *= scale;
+  // ── Slide path (T-105) ───────────────────────────────────────────────────────
+  if (isSliding) {
+    // During the slide boost window: apply reduced friction (momentum carry) and
+    // do NOT apply the normal acceleration toward wish velocity. The velocity
+    // direction from the slide trigger is preserved; only magnitude decays.
+    // This lets the player slide in the direction they were running.
+    const horizSpeed2 = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+    if (horizSpeed2 > 0 && state.onGround) {
+      const slideFrictionFactor = 1 - Math.exp(-SLIDE_FRICTION * dt);
+      const newSpeed = Math.max(0, horizSpeed2 - horizSpeed2 * slideFrictionFactor);
+      const scale = newSpeed / horizSpeed2;
+      vel.x *= scale;
+      vel.z *= scale;
+    }
+    // No accel during slide boost (momentum carry). Skip normal accel/friction pass.
+  } else {
+    // ── Normal friction + acceleration ────────────────────────────────────────
+
+    // --- Friction (horizontal) — frame-rate-independent exponential decay ---
+    // Applied EVERY grounded tick, independent of wish input. While a key is held,
+    // the high-accel step below restores the target speed; when input is released
+    // OR reversed, this friction decays the carried velocity within a few ticks —
+    // that is the counter-strafe brake (research/03 §7.1).
+    const horizSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
+    if (horizSpeed > 0 && state.onGround) {
+      // decay factor: 1 - exp(-friction * dt)
+      const frictionFactor = 1 - Math.exp(-params.friction * dt);
+      const newSpeed = Math.max(0, horizSpeed - horizSpeed * frictionFactor);
+      const scale = horizSpeed > 0 ? newSpeed / horizSpeed : 0;
+      vel.x *= scale;
+      vel.z *= scale;
+    }
+
+    // --- Ground acceleration toward wish velocity ---
+    if (wishX !== 0 || wishZ !== 0) {
+      // Compose multipliers: per-weapon moveMult × crouch multiplier.
+      // Crouch wins over sprint (sprint multiplier is ignored when crouching — handled
+      // in world.ts by zeroing sprintMult when isCrouched). The moveMult passed here
+      // already has sprint folded in from world.ts when not crouching.
+      const crouchFactor = isCrouched ? CROUCH_SPEED_MULT : 1.0;
+      const effectiveMaxSpeed = params.maxRunSpeed * (params.moveMult ?? 1.0) * crouchFactor;
+      const targetX = wishX * effectiveMaxSpeed;
+      const targetZ = wishZ * effectiveMaxSpeed;
+      // Clamp accel to at most 1 (can't overshoot in one tick)
+      const accelFactor = Math.min(1, params.groundAccel * dt);
+      vel.x += (targetX - vel.x) * accelFactor;
+      vel.z += (targetZ - vel.z) * accelFactor;
+    }
   }
 
-  // --- Ground acceleration toward wish velocity ---
-  if (wishX !== 0 || wishZ !== 0) {
-    // Compose multipliers: per-weapon moveMult × crouch multiplier.
-    // Crouch wins over sprint (sprint multiplier is ignored when crouching — handled
-    // in world.ts by zeroing sprintMult when isCrouched). The moveMult passed here
-    // already has sprint folded in from world.ts when not crouching.
-    const crouchFactor = isCrouched ? CROUCH_SPEED_MULT : 1.0;
-    const effectiveMaxSpeed = params.maxRunSpeed * (params.moveMult ?? 1.0) * crouchFactor;
-    const targetX = wishX * effectiveMaxSpeed;
-    const targetZ = wishZ * effectiveMaxSpeed;
-    // Clamp accel to at most 1 (can't overshoot in one tick)
-    const accelFactor = Math.min(1, params.groundAccel * dt);
-    vel.x += (targetX - vel.x) * accelFactor;
-    vel.z += (targetZ - vel.z) * accelFactor;
-  }
-
-  // --- Jump (only allowed when standing, not while crouched — per CoD/Valorant model) ---
+  // --- Jump (only allowed when standing, not while sliding) ---
   // NOTE: jump IS allowed while crouched per research/03 §7.3 (no explicit block).
   // CoD allows jumping while crouched. We allow it here.
-  if (jump && state.onGround) {
+  // Jump cancels slide (momentum lost, but jump takes priority).
+  if (jump && state.onGround && !isSliding) {
     vel.y = params.jumpSpeed;
     state.onGround = false;
     // When jumping from crouch, uncrouch in air.
@@ -501,4 +647,79 @@ export function integratePlayer(
   moveAndResolve(state, delta, colliders, effectiveCapsule, STEP_HEIGHT);
 
   return isCrouched;
+}
+
+// ── Mantle detection helper (T-105) ───────────────────────────────────────────
+
+/**
+ * Detect whether the player can mantle a ledge in the current movement direction.
+ *
+ * Returns the mantle target foot Y (ledge top surface) and the direction to push,
+ * or null if no mantleable ledge is found.
+ *
+ * Algorithm:
+ *   1. Cast a forward probe from foot position in the wish direction.
+ *   2. Check if we collide with a wall (horizontal normal).
+ *   3. Find the top of that wall (box.center.y + box.half.y).
+ *   4. If top is > STEP_HEIGHT and ≤ MAX_MANTLE_HEIGHT, check capsule clearance above.
+ *   5. If clear, return the target Y and direction.
+ *
+ * Called from world.ts BEFORE integratePlayer when:
+ *   - Player is on ground (or just ran into a wall)
+ *   - Player has horizontal wish input
+ *   - Player is NOT currently mantling
+ */
+export function detectMantle(
+  footX: number,
+  footY: number,
+  footZ: number,
+  wishX: number,
+  wishZ: number,
+  colliders: readonly BoxCollider[],
+): { targetY: number; dirX: number; dirZ: number } | null {
+  // Normalize wish direction (should already be normalized, but be safe)
+  const wishLen = Math.sqrt(wishX * wishX + wishZ * wishZ);
+  if (wishLen < 0.01) return null;
+  const dirX = wishX / wishLen;
+  const dirZ = wishZ / wishLen;
+
+  // Probe ahead by a small distance (capsule radius + skin + tiny forward step)
+  const probeX = footX + dirX * (PLAYER_CAPSULE.radius + SKIN + 0.05);
+  const probeZ = footZ + dirZ * (PLAYER_CAPSULE.radius + SKIN + 0.05);
+
+  let bestLedgeTopY = -Infinity;
+  let foundWall = false;
+
+  for (const box of colliders) {
+    // Check if probing forward would intersect the box (only wall-like hits)
+    const hit = resolveCapsuleVsBox(probeX, footY, probeZ, PLAYER_CAPSULE, box);
+    if (!hit || Math.abs(hit.ny) > 0.7) continue; // not a wall hit
+
+    // This is a wall-like collider in the forward direction
+    const ledgeTopY = box.center.y + box.half.y;
+    const stepNeeded = ledgeTopY - footY;
+
+    // Must be > step height (otherwise handled by step-up) and <= max mantle height
+    if (stepNeeded > STEP_HEIGHT && stepNeeded <= MAX_MANTLE_HEIGHT) {
+      if (ledgeTopY > bestLedgeTopY) {
+        bestLedgeTopY = ledgeTopY;
+        foundWall = true;
+      }
+    }
+  }
+
+  if (!foundWall) return null;
+
+  // Check capsule clearance above the ledge top
+  // Player capsule standing height = 2*radius + 2*halfHeight = 1.8 m
+  // After mantle, foot is at bestLedgeTopY, need clearance for full standing capsule
+  const testFootY = bestLedgeTopY + SKIN;
+  for (const box of colliders) {
+    const hit = resolveCapsuleVsBox(probeX, testFootY, probeZ, PLAYER_CAPSULE, box);
+    // Block mantle if there's a ceiling that prevents standing (upward normal)
+    // Use a small depth threshold to ignore grazing contacts
+    if (hit && hit.ny > 0.7 && hit.depth > 0.01) return null;
+  }
+
+  return { targetY: bestLedgeTopY, dirX, dirZ };
 }
