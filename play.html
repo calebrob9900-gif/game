@@ -1,0 +1,249 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1" />
+<title>Drive! — double-click to play</title>
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 100%; height: 100%; overflow: hidden; background: #8fc4ff; font-family: system-ui, 'Segoe UI', sans-serif; }
+  canvas { display: block; }
+  #loading { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; color: #0b2547; font-size: 20px; text-align: center; padding: 24px; }
+  .hud { position: fixed; top: 16px; left: 16px; padding: 12px 16px; border-radius: 12px; color: #fff;
+         background: rgba(8,12,24,.55); backdrop-filter: blur(8px); border: 1px solid rgba(255,255,255,.12);
+         line-height: 1.5; font-variant-numeric: tabular-nums; }
+  .hud .big { font-size: 28px; font-weight: 800; }
+  .hud .label { color: #93a3c4; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+  .hud b { color: #6ee7ff; font-weight: 700; }
+  .banner { position: fixed; inset: 0; display: flex; align-items: center; justify-content: center; text-align: center;
+            font-size: 48px; font-weight: 900; color: #fff; opacity: 0; transition: opacity .3s; pointer-events: none;
+            text-shadow: 0 4px 24px rgba(0,0,0,.5); }
+  .banner small { display: block; font-size: 18px; font-weight: 500; margin-top: 10px; }
+  .help { position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); padding: 10px 16px; border-radius: 999px;
+          background: rgba(8,12,24,.55); backdrop-filter: blur(8px); color: #cdd8ef; font-size: 13px; text-align: center; }
+  .help kbd { background: rgba(255,255,255,.14); border: 1px solid rgba(255,255,255,.25); border-radius: 6px; padding: 2px 7px; margin: 0 2px; }
+</style>
+</head>
+<body>
+<div id="loading">Loading the 3D engine… (needs internet the first time)</div>
+<script src="https://unpkg.com/three@0.137.0/build/three.min.js"></script>
+<script>
+if (typeof THREE === 'undefined') {
+  document.getElementById('loading').innerHTML =
+    "Couldn't load the 3D library.<br>Check your internet connection and re-open this file.";
+} else {
+  document.getElementById('loading').remove();
+  start();
+}
+
+function start() {
+  // ---- Renderer / scene / camera ----
+  const renderer = new THREE.WebGLRenderer({ antialias: true });
+  renderer.setSize(innerWidth, innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.shadowMap.enabled = true;
+  renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+  renderer.outputEncoding = THREE.sRGBEncoding;
+  renderer.toneMapping = THREE.ACESFilmicToneMapping;
+  document.body.appendChild(renderer.domElement);
+
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x8fc4ff);
+  scene.fog = new THREE.Fog(0x8fc4ff, 120, 900);
+
+  const camera = new THREE.PerspectiveCamera(65, innerWidth / innerHeight, 0.1, 2000);
+  addEventListener('resize', () => {
+    camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth, innerHeight);
+  });
+
+  // ---- Lights ----
+  scene.add(new THREE.HemisphereLight(0xbfe3ff, 0x4a4032, 1.1));
+  const sun = new THREE.DirectionalLight(0xfff3e0, 2.4);
+  sun.position.set(120, 200, 80); sun.castShadow = true;
+  sun.shadow.mapSize.set(2048, 2048);
+  const S = 160;
+  sun.shadow.camera.left = -S; sun.shadow.camera.right = S; sun.shadow.camera.top = S; sun.shadow.camera.bottom = -S;
+  sun.shadow.camera.far = 800; sun.shadow.bias = -0.0004;
+  scene.add(sun); scene.add(sun.target);
+
+  // ---- Ground + grid ----
+  const ground = new THREE.Mesh(new THREE.PlaneGeometry(4000, 4000),
+    new THREE.MeshStandardMaterial({ color: 0x3c6b3a, roughness: 1 }));
+  ground.rotation.x = -Math.PI / 2; ground.receiveShadow = true; scene.add(ground);
+  const grid = new THREE.GridHelper(4000, 200, 0x2c4f2b, 0x2c4f2b); grid.position.y = 0.02; scene.add(grid);
+
+  // ---- Trees & rocks ----
+  const trunkMat = new THREE.MeshStandardMaterial({ color: 0x6b4a2b });
+  const leafMat = new THREE.MeshStandardMaterial({ color: 0x2f7d3a });
+  const rockMat = new THREE.MeshStandardMaterial({ color: 0x808890, roughness: 1 });
+  for (let i = 0; i < 200; i++) {
+    const r = 120 + Math.random() * 1400, a = Math.random() * Math.PI * 2;
+    const x = Math.cos(a) * r, z = Math.sin(a) * r;
+    if (Math.random() < 0.7) {
+      const t = new THREE.Group();
+      const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.9, 5, 6), trunkMat);
+      trunk.position.y = 2.5; trunk.castShadow = true;
+      const leaves = new THREE.Mesh(new THREE.ConeGeometry(4, 10, 7), leafMat);
+      leaves.position.y = 9; leaves.castShadow = true;
+      t.add(trunk, leaves); t.position.set(x, 0, z); t.scale.setScalar(0.6 + Math.random()); scene.add(t);
+    } else {
+      const rock = new THREE.Mesh(new THREE.DodecahedronGeometry(1 + Math.random() * 2), rockMat);
+      rock.position.set(x, 0.6, z); rock.castShadow = true; scene.add(rock);
+    }
+  }
+
+  // ---- Jump ramps ----
+  const ramps = [];
+  function makeRamp(x, z, yaw, scale) {
+    const w = 14 * scale, h = 6 * scale, len = 22 * scale;
+    const geo = new THREE.BoxGeometry(w, h, len);
+    const p = geo.attributes.position;
+    for (let i = 0; i < p.count; i++) {
+      const zz = p.getZ(i), yy = p.getY(i);
+      p.setY(i, zz > 0 ? yy + h / 2 : yy - h / 2);
+    }
+    geo.computeVertexNormals();
+    const m = new THREE.Mesh(geo, new THREE.MeshStandardMaterial({ color: 0xd64545, roughness: 0.8 }));
+    m.position.set(x, h / 2, z); m.rotation.y = yaw; m.castShadow = true; m.receiveShadow = true;
+    scene.add(m); ramps.push({ x, z, scale });
+  }
+  makeRamp(0, 90, 0, 1.4); makeRamp(120, -60, Math.PI / 2, 1); makeRamp(-150, 40, -Math.PI / 4, 1.2);
+  makeRamp(60, 240, Math.PI, 1.6); makeRamp(-90, -200, Math.PI / 6, 1);
+
+  // ---- Vehicle ----
+  function buildCar() {
+    const g = new THREE.Group();
+    const bodyMat = new THREE.MeshStandardMaterial({ color: 0x2a7fff, metalness: 0.4, roughness: 0.35 });
+    const body = new THREE.Mesh(new THREE.BoxGeometry(4, 1.1, 8), bodyMat); body.position.y = 1.1; body.castShadow = true;
+    const cabin = new THREE.Mesh(new THREE.BoxGeometry(3.2, 1.2, 4), new THREE.MeshStandardMaterial({ color: 0x10243f }));
+    cabin.position.set(0, 2.1, -0.3); cabin.castShadow = true;
+    const spoiler = new THREE.Mesh(new THREE.BoxGeometry(4.2, 0.3, 1), bodyMat); spoiler.position.set(0, 2.0, -3.6);
+    g.add(body, cabin, spoiler); return g;
+  }
+  function buildBike() {
+    const g = new THREE.Group();
+    const frameMat = new THREE.MeshStandardMaterial({ color: 0xff5a2a, metalness: 0.3, roughness: 0.4 });
+    const frame = new THREE.Mesh(new THREE.BoxGeometry(1, 1.4, 5), frameMat); frame.position.y = 1.6; frame.castShadow = true;
+    const seat = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.5, 2.4), new THREE.MeshStandardMaterial({ color: 0x111111 }));
+    seat.position.set(0, 2.4, -0.5); g.add(frame, seat); return g;
+  }
+  const wheelGeo = new THREE.CylinderGeometry(1.1, 1.1, 0.7, 16);
+  const wheelMat = new THREE.MeshStandardMaterial({ color: 0x111418, roughness: 0.9 });
+  function addWheels(group) {
+    const wheels = [];
+    [[-1.9, 3.0], [1.9, 3.0], [-1.9, -3.0], [1.9, -3.0]].forEach(([x, z]) => {
+      const w = new THREE.Mesh(wheelGeo, wheelMat); w.rotation.z = Math.PI / 2; w.position.set(x, 1.1, z);
+      w.castShadow = true; group.add(w); wheels.push(w);
+    });
+    return wheels;
+  }
+  const car = new THREE.Group();
+  let skin = buildCar(); car.add(skin);
+  let wheels = addWheels(car); scene.add(car);
+
+  // ---- State ----
+  const v = { pos: new THREE.Vector3(0, 0, -20), yaw: 0, speed: 0, vy: 0, airborne: false, pitch: 0, isBike: false };
+  const GRAVITY = 55;
+  let airtime = 0, score = 0, bestAir = 0;
+
+  // ---- Input ----
+  const keys = new Set(), pressed = new Set();
+  addEventListener('keydown', e => {
+    if (!keys.has(e.code)) pressed.add(e.code);
+    keys.add(e.code);
+    if (['ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight', 'Space'].includes(e.code)) e.preventDefault();
+  });
+  addEventListener('keyup', e => keys.delete(e.code));
+  const down = c => keys.has(c);
+
+  // ---- HUD / banner / help ----
+  const hud = document.createElement('div'); hud.className = 'hud'; document.body.appendChild(hud);
+  const bannerEl = document.createElement('div'); bannerEl.className = 'banner'; document.body.appendChild(bannerEl);
+  const help = document.createElement('div'); help.className = 'help';
+  help.innerHTML = '<kbd>W</kbd>/<kbd>S</kbd> drive · <kbd>A</kbd>/<kbd>D</kbd> steer · <kbd>Space</kbd> handbrake · <kbd>&uarr;</kbd>/<kbd>&darr;</kbd> flip in air · <kbd>V</kbd> car/bike · <kbd>R</kbd> reset';
+  document.body.appendChild(help);
+  let bannerTimer = 0;
+  function showBanner(html, t) { bannerEl.innerHTML = html; bannerEl.style.opacity = '1'; bannerTimer = t; }
+
+  const damp = (a, b, l, dt) => THREE.MathUtils.lerp(a, b, 1 - Math.exp(-l * dt));
+
+  function swap() {
+    car.remove(skin); v.isBike = !v.isBike; skin = v.isBike ? buildBike() : buildCar(); car.add(skin);
+  }
+
+  // ---- Loop ----
+  const clock = new THREE.Clock();
+  function loop() {
+    requestAnimationFrame(loop);
+    const dt = Math.min(clock.getDelta(), 0.05);
+    const maxFwd = v.isBike ? 95 : 80, accel = v.isBike ? 55 : 45, turnRate = v.isBike ? 1.8 : 1.5;
+
+    if (down('KeyW') || down('ArrowUp')) v.speed += accel * dt;
+    else if (down('KeyS') || down('ArrowDown')) v.speed -= accel * 1.1 * dt;
+    else v.speed *= (1 - 0.6 * dt);
+    v.speed = THREE.MathUtils.clamp(v.speed, -28, maxFwd);
+
+    const handbrake = down('Space');
+    if (!v.airborne) {
+      const steer = (down('KeyA') ? 1 : 0) - (down('KeyD') ? 1 : 0);
+      v.yaw += steer * turnRate * (handbrake ? 1.9 : 1) * dt * THREE.MathUtils.clamp(v.speed / 25, -1, 1);
+      if (handbrake) v.speed *= (1 - 1.2 * dt);
+    }
+
+    const fwd = new THREE.Vector3(Math.sin(v.yaw), 0, Math.cos(v.yaw));
+    v.pos.addScaledVector(fwd, v.speed * dt);
+
+    if (!v.airborne && v.speed > 28) {
+      for (const r of ramps) {
+        const dx = v.pos.x - r.x, dz = v.pos.z - r.z;
+        if (dx * dx + dz * dz < (16 * r.scale) ** 2) {
+          v.airborne = true; v.vy = v.speed * 0.55 + 12 * r.scale; airtime = 0; break;
+        }
+      }
+    }
+
+    if (v.airborne) {
+      v.vy -= GRAVITY * dt; v.pos.y += v.vy * dt; airtime += dt;
+      const flip = (down('ArrowUp') ? 1 : 0) - (down('ArrowDown') ? 1 : 0);
+      v.pitch += flip * 4 * dt;
+      if (v.pos.y <= 0) {
+        v.pos.y = 0;
+        const flips = Math.floor(Math.abs(v.pitch) / (Math.PI * 2));
+        const gained = Math.round(airtime * 50 + flips * 250);
+        score += gained; bestAir = Math.max(bestAir, airtime);
+        if (airtime > 0.6) showBanner('+' + gained + '<small>' + (flips ? flips + 'x FLIP! ' : '') + airtime.toFixed(1) + 's air</small>', 1.2);
+        v.airborne = false; v.vy = 0; v.pitch = 0;
+      }
+    }
+
+    if (bannerTimer > 0) { bannerTimer -= dt; if (bannerTimer <= 0) bannerEl.style.opacity = '0'; }
+    if (pressed.has('KeyV')) swap();
+    if (pressed.has('KeyR')) { v.pos.set(0, 0, -20); v.yaw = 0; v.speed = 0; v.airborne = false; v.pitch = 0; }
+    pressed.clear();
+
+    car.position.copy(v.pos); car.rotation.set(v.pitch, v.yaw, 0);
+    const steerVis = (down('KeyA') ? 0.4 : 0) - (down('KeyD') ? 0.4 : 0);
+    wheels.forEach((w, i) => { w.rotation.x += v.speed * dt * 0.5; if (i < 2) w.rotation.y = steerVis; });
+
+    const tx = v.pos.x - Math.sin(v.yaw) * 22, ty = v.pos.y + 11, tz = v.pos.z - Math.cos(v.yaw) * 22;
+    camera.position.x = damp(camera.position.x, tx, 6, dt);
+    camera.position.y = damp(camera.position.y, ty, 6, dt);
+    camera.position.z = damp(camera.position.z, tz, 6, dt);
+    camera.lookAt(v.pos.x, v.pos.y + 2, v.pos.z);
+
+    const kmh = Math.abs(Math.round(v.speed * 3.6));
+    hud.innerHTML =
+      '<div class="label">' + (v.isBike ? '🏍️ Dirt Bike' : '🏎️ Car') + '</div>' +
+      '<div class="big">' + kmh + ' <span style="font-size:14px">km/h</span></div>' +
+      '<div><span class="label">Score</span> <b>' + score + '</b></div>' +
+      '<div><span class="label">Best air</span> <b>' + bestAir.toFixed(1) + 's</b></div>' +
+      (v.airborne ? '<div style="color:#ffd36e">✈ AIRBORNE ' + airtime.toFixed(1) + 's</div>' : '');
+
+    renderer.render(scene, camera);
+  }
+  loop();
+}
+</script>
+</body>
+</html>
