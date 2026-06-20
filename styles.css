@@ -1,0 +1,81 @@
+/* ---- Shared styling for the hub + all game HUDs ---- */
+* { margin: 0; padding: 0; box-sizing: border-box; }
+html, body { width: 100%; height: 100%; overflow: hidden; background: #0b0f1a; }
+body { font-family: 'Segoe UI', system-ui, sans-serif; color: #fff; }
+canvas { display: block; }
+
+/* ---------- Hub (index.html) ---------- */
+.hub {
+  overflow-y: auto;
+  height: 100vh;
+  padding: 48px 24px 64px;
+  background:
+    radial-gradient(1200px 600px at 70% -10%, #1d3a6e 0%, transparent 60%),
+    radial-gradient(900px 500px at 10% 110%, #5b1d6e 0%, transparent 55%),
+    linear-gradient(160deg, #0b0f1a 0%, #0e1426 100%);
+}
+.hub h1 {
+  font-size: clamp(32px, 6vw, 64px);
+  text-align: center;
+  letter-spacing: -1px;
+  background: linear-gradient(90deg, #6ee7ff, #a78bfa, #f0abfc);
+  -webkit-background-clip: text; background-clip: text; color: transparent;
+}
+.hub .sub { text-align: center; color: #9fb0d0; margin: 10px 0 40px; font-size: clamp(14px, 2vw, 18px); }
+.grid {
+  display: grid; gap: 22px; max-width: 1100px; margin: 0 auto;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+}
+.card {
+  position: relative; display: block; text-decoration: none; color: #fff;
+  border-radius: 18px; padding: 26px; overflow: hidden;
+  background: linear-gradient(160deg, rgba(255,255,255,0.07), rgba(255,255,255,0.02));
+  border: 1px solid rgba(255,255,255,0.10);
+  transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.card:hover { transform: translateY(-6px); border-color: rgba(110,231,255,0.6); box-shadow: 0 18px 40px rgba(0,0,0,0.45); }
+.card .emoji { font-size: 46px; }
+.card h2 { font-size: 22px; margin: 14px 0 8px; }
+.card p { color: #aebbd6; font-size: 14px; line-height: 1.5; }
+.card .tag {
+  display: inline-block; margin-top: 16px; padding: 7px 16px; border-radius: 999px;
+  font-weight: 600; font-size: 13px; background: linear-gradient(90deg, #6ee7ff, #a78bfa); color: #0b0f1a;
+}
+.hub footer { text-align: center; color: #6b7a99; margin-top: 44px; font-size: 13px; }
+
+/* ---------- In-game overlays ---------- */
+.hud {
+  position: fixed; top: 16px; left: 16px; z-index: 10;
+  padding: 14px 18px; border-radius: 14px; pointer-events: none;
+  background: rgba(8, 12, 24, 0.55); backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.12);
+  font-variant-numeric: tabular-nums; line-height: 1.5; font-size: 15px;
+}
+.hud b { color: #6ee7ff; font-weight: 700; }
+.hud .big { font-size: 30px; font-weight: 800; }
+.hud .label { color: #93a3c4; font-size: 12px; text-transform: uppercase; letter-spacing: 1px; }
+
+.banner {
+  position: fixed; inset: 0; z-index: 20; display: flex; align-items: center; justify-content: center;
+  text-align: center; pointer-events: none; opacity: 0; transition: opacity .3s ease;
+  font-size: clamp(28px, 6vw, 64px); font-weight: 900; letter-spacing: -1px;
+  text-shadow: 0 6px 30px rgba(0,0,0,0.6);
+}
+.banner small { display:block; font-size: 18px; font-weight: 500; color:#cdd8ef; margin-top: 12px; letter-spacing: 0; }
+
+.back {
+  position: fixed; top: 16px; right: 16px; z-index: 30;
+  padding: 9px 16px; border-radius: 999px; text-decoration: none; font-size: 14px; font-weight: 600;
+  color: #fff; background: rgba(8,12,24,0.6); border: 1px solid rgba(255,255,255,0.15); backdrop-filter: blur(8px);
+}
+.back:hover { border-color: #6ee7ff; }
+
+.help {
+  position: fixed; bottom: 16px; left: 50%; transform: translateX(-50%); z-index: 10;
+  padding: 10px 18px; border-radius: 999px; font-size: 13px; color: #cdd8ef; text-align:center;
+  background: rgba(8,12,24,0.55); border: 1px solid rgba(255,255,255,0.12); backdrop-filter: blur(8px);
+}
+.help kbd {
+  display: inline-block; padding: 2px 7px; margin: 0 2px; border-radius: 6px; font-family: inherit;
+  background: rgba(255,255,255,0.12); border: 1px solid rgba(255,255,255,0.2); font-size: 12px;
+}
