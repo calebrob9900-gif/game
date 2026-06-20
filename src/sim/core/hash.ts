@@ -70,6 +70,15 @@ function foldEntity(h: number, e: Entity): number {
   if (e.isMantling !== undefined) h = foldStr(h, e.isMantling ? 'ML' : 'ml');
   if (e.mantleTicksLeft !== undefined && e.mantleTicksLeft > 0)
     h = foldNumber(h, e.mantleTicksLeft);
+  // Recoil state (T-112) — only hashed when present so existing goldens are unchanged.
+  if (e.recoilShot !== undefined && e.recoilShot > 0) h = foldNumber(h, e.recoilShot);
+  if (e.recoilPitch !== undefined && e.recoilPitch !== 0) h = foldNumber(h, e.recoilPitch);
+  if (e.recoilYaw !== undefined && e.recoilYaw !== 0) h = foldNumber(h, e.recoilYaw);
+  if (e.recoilTicksSinceLastShot !== undefined && e.recoilTicksSinceLastShot > 0)
+    h = foldNumber(h, e.recoilTicksSinceLastShot);
+  if (e.visualKickPitch !== undefined && e.visualKickPitch !== 0)
+    h = foldNumber(h, e.visualKickPitch);
+  if (e.visualKickYaw !== undefined && e.visualKickYaw !== 0) h = foldNumber(h, e.visualKickYaw);
   return h;
 }
 

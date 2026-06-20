@@ -1,7 +1,7 @@
 import { World } from './core/ecs';
 import { EventBus } from './core/events';
-import { createRng, type RngState } from './core/rng';
-import { DT, TICK_RATE } from './core/time';
+import { createRng, rngRange, type RngState } from './core/rng';
+import { DT, TICK_RATE, decay } from './core/time';
 import { vec3, lengthHoriz, type Vec3 } from './core/vec';
 import { foldCommands, type Command } from './input/commands';
 import type { LevelDescriptor } from './levels/levelDescriptor';
@@ -112,6 +112,40 @@ export interface Entity {
    * The fire system tests `health !== undefined` as the actual gate.
    */
   damageable?: boolean;
+  // ── Recoil state (T-112, research/03 §1) ─────────────────────────────────────
+  /**
+   * Number of shots fired in the current burst (0-indexed shot counter).
+   * Resets when the player stops firing (after recoilRecoveryDelay elapses).
+   * Used to index into weapon.recoilPattern.
+   */
+  recoilShot?: number;
+  /**
+   * Accumulated aim-recoil pitch offset (radians) from the pattern.
+   * Applied to the hitscan ray direction so bullets go where pattern dictates.
+   * Recovers toward 0 after recoilRecoveryDelay at recoilRecoverySpeed.
+   */
+  recoilPitch?: number;
+  /**
+   * Accumulated aim-recoil yaw offset (radians) from the pattern.
+   * Same semantics as recoilPitch.
+   */
+  recoilYaw?: number;
+  /**
+   * Ticks since last shot, tracked for recovery delay.
+   * Incremented each tick when not firing; reset to 0 when firing.
+   * Recovery begins once this exceeds (recoilRecoveryDelay / DT) ticks.
+   */
+  recoilTicksSinceLastShot?: number;
+  /**
+   * Visual kick pitch (radians) — additional recoverable camera punch.
+   * Does NOT affect bullet direction (visualKickMult fraction of aim recoil).
+   * Exposed in snapshot for presentation (camera punch).
+   */
+  visualKickPitch?: number;
+  /**
+   * Visual kick yaw (radians) — same semantics as visualKickPitch.
+   */
+  visualKickYaw?: number;
   // ── Slide state (T-105, research/03 §7.3) ────────────────────────────────────
   /**
    * Whether the player is currently sliding.
@@ -561,11 +595,65 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
 
     if (canFire && p.weaponId !== undefined) {
       const weapon = getWeapon(p.weaponId);
-      // Construct a typed shooter context with non-optional yaw/pitch/position
+
+      // --- recoil (T-112) ---------------------------------------------------
+      // Aim recoil: apply per-shot pattern offset to the accumulated aim offset.
+      // The accumulated offset is added to yaw/pitch when building the hitscan ray
+      // so bullets travel along the pattern, not the player's base look direction.
+      //
+      // Pattern entries are in degrees (research/03 §1.2); convert to radians here.
+      const DEG2RAD = Math.PI / 180;
+
+      // Initialise recoil fields on first use (preserves absent-field behaviour for
+      // existing tests that don't fire — hash only folds non-zero values).
+      const recoilShot = p.recoilShot ?? 0;
+      const recoilPitchPrev = p.recoilPitch ?? 0;
+      const recoilYawPrev = p.recoilYaw ?? 0;
+
+      const pattern = weapon.recoilPattern;
+      // Clamp to last entry when shot index exceeds pattern length
+      const patternIdx = Math.min(recoilShot, pattern.length - 1);
+      const patternEntry = pattern[patternIdx]!;
+
+      // For shots beyond the fixed pattern, add ±recoilTailRandom noise using
+      // the seeded PRNG (deterministic, never Math.random).
+      let pitchKickDeg = patternEntry.p;
+      let yawKickDeg = patternEntry.y;
+      if (recoilShot >= pattern.length && weapon.recoilTailRandom > 0) {
+        const tr = weapon.recoilTailRandom;
+        pitchKickDeg += rngRange(world.rng, -tr, tr);
+        yawKickDeg += rngRange(world.rng, -tr, tr);
+      }
+
+      const pitchKickRad = pitchKickDeg * DEG2RAD;
+      const yawKickRad = yawKickDeg * DEG2RAD;
+
+      // Accumulate aim offset: pitch positive = up (reduces pitch since pitch is
+      // "looking up = negative pitch" in this sim convention — but research/03 §1.2
+      // says pitch positive = up kick, so we SUBTRACT from pitch to kick upward).
+      const newRecoilPitch = recoilPitchPrev - pitchKickRad;
+      const newRecoilYaw = recoilYawPrev + yawKickRad;
+
+      // Visual kick layer: separate recoverable camera punch (does NOT affect bullets).
+      // Accumulate additively like aim recoil; it recovers faster (see recovery below).
+      const vKickPitch = (p.visualKickPitch ?? 0) - pitchKickRad * weapon.visualKickMult;
+      const vKickYaw = (p.visualKickYaw ?? 0) + yawKickRad * weapon.visualKickMult;
+
+      // Write recoil state back to player entity
+      p.recoilShot = recoilShot + 1;
+      p.recoilPitch = newRecoilPitch;
+      p.recoilYaw = newRecoilYaw;
+      p.recoilTicksSinceLastShot = 0;
+      p.visualKickPitch = vKickPitch;
+      p.visualKickYaw = vKickYaw;
+      // --- end recoil aim accumulation (T-112) --------------------------------
+
+      // Construct shooter context with recoil-offset aim direction so bullets
+      // follow the pattern (aim recoil is authoritative for bullet direction).
       const shooter = {
         position: p.position,
-        yaw: p.yaw ?? 0,
-        pitch: p.pitch ?? 0,
+        yaw: (p.yaw ?? 0) + newRecoilYaw,
+        pitch: (p.pitch ?? 0) + newRecoilPitch,
         player: p.player,
       };
       const hit = fireHitscan(world, shooter, weapon);
@@ -588,6 +676,71 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
         }
       }
     }
+  } else {
+    // --- recoil (T-112) recovery -------------------------------------------
+    // When not firing, advance the ticks-since-last-shot counter and, once
+    // past the recovery delay, exponentially lerp accumulated aim offset back
+    // toward zero. Visual kick recovers at the same rate (it's presentation-
+    // only and has no separate delay — it punches fast and recovers fast too).
+    //
+    // Only run the recovery branch when recoil state is non-zero (preserves
+    // existing golden hashes for scenarios that never fire).
+    if (
+      p.recoilPitch !== undefined ||
+      p.recoilYaw !== undefined ||
+      p.recoilTicksSinceLastShot !== undefined
+    ) {
+      const ticksSince = (p.recoilTicksSinceLastShot ?? 0) + 1;
+      p.recoilTicksSinceLastShot = ticksSince;
+
+      // Reset shot counter once the player has not fired for > recoveryDelay.
+      // We use weapon id to look up the def only when needed.
+      if (p.weaponId !== undefined) {
+        const weapon = getWeapon(p.weaponId);
+        const delayTicks = weapon.recoilRecoveryDelay / DT;
+
+        if (ticksSince > delayTicks) {
+          // Exponential recovery toward 0 (frame-rate independent, research/03 §1.3 + §3.5).
+          // factor = 1 - exp(-recoilRecoverySpeed * DT)
+          const f = decay(weapon.recoilRecoverySpeed, DT) * weapon.autoRecoverFraction;
+
+          if (p.recoilPitch !== undefined && p.recoilPitch !== 0) {
+            p.recoilPitch = p.recoilPitch - p.recoilPitch * f;
+            // Snap to 0 when negligibly small (avoids perpetual drift)
+            if (Math.abs(p.recoilPitch) < 1e-6) p.recoilPitch = 0;
+          }
+          if (p.recoilYaw !== undefined && p.recoilYaw !== 0) {
+            p.recoilYaw = p.recoilYaw - p.recoilYaw * f;
+            if (Math.abs(p.recoilYaw) < 1e-6) p.recoilYaw = 0;
+          }
+
+          // Also reset shot counter so the next burst starts fresh
+          if (p.recoilShot !== undefined && p.recoilShot > 0) {
+            const resetF = decay(weapon.recoilRecoverySpeed, DT);
+            // Shot counter resets faster — once offset is near zero, counter resets too.
+            // Use the same exponential factor; integer counter: reduce by 1 per
+            // recovery tick once fully in recovery (simple approach — not hashed float).
+            // Actually: snap to 0 when the offset is near zero.
+            if (Math.abs(p.recoilPitch ?? 0) < 0.001 && Math.abs(p.recoilYaw ?? 0) < 0.001) {
+              p.recoilShot = 0;
+            }
+            void resetF; // suppress unused warning
+          }
+        }
+
+        // Visual kick recovers independently (fast punch-and-recover, no delay).
+        const vKickF = decay(weapon.recoilRecoverySpeed * 2, DT);
+        if (p.visualKickPitch !== undefined && p.visualKickPitch !== 0) {
+          p.visualKickPitch = p.visualKickPitch - p.visualKickPitch * vKickF;
+          if (Math.abs(p.visualKickPitch) < 1e-6) p.visualKickPitch = 0;
+        }
+        if (p.visualKickYaw !== undefined && p.visualKickYaw !== 0) {
+          p.visualKickYaw = p.visualKickYaw - p.visualKickYaw * vKickF;
+          if (Math.abs(p.visualKickYaw) < 1e-6) p.visualKickYaw = 0;
+        }
+      }
+    }
+    // --- end recoil recovery (T-112) ----------------------------------------
   }
   // --- end combat/fire -------------------------------------------------------
 
