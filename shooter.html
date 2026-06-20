@@ -8,6 +8,10 @@
   * { margin: 0; padding: 0; box-sizing: border-box; }
   html, body { width: 100%; height: 100%; overflow: hidden; background: #04060d; font-family: system-ui, 'Segoe UI', sans-serif; color: #fff; user-select: none; }
   canvas { display: block; }
+  /* cinematic post-fx: vignette + faint scanlines (pure CSS, no perf cost) */
+  #fx { position: fixed; inset: 0; z-index: 9; pointer-events: none; opacity: .55; mix-blend-mode: multiply;
+    box-shadow: inset 0 0 220px 80px rgba(0,0,0,.55);
+    background: repeating-linear-gradient(0deg, rgba(0,0,0,.05) 0 1px, transparent 1px 3px); }
 
   #top { position: fixed; top: 14px; left: 50%; transform: translateX(-50%); z-index: 10; display: flex; gap: 24px; padding: 9px 20px;
     border-radius: 12px; background: rgba(8,12,24,.5); border: 1px solid rgba(255,255,255,.12); backdrop-filter: blur(8px); pointer-events: none; }
@@ -74,6 +78,7 @@
 </style>
 </head>
 <body>
+  <div id="fx"></div>
   <div id="top">
     <div><div class="label">Wave</div><div class="val wave" id="vWave">1</div></div>
     <div><div class="label">Score</div><div class="val score" id="vScore">0</div></div>
@@ -222,7 +227,7 @@
       tank:   { hp: 200, speed: 3.6, dmg: 20, color: 0xffb800, scale: 1.5, value: 280, ranged: false },
       shooter:{ hp: 40, speed: 5, dmg: 10, color: 0xa855f7, scale: 1, value: 200, ranged: true },
     };
-    const enemies = [];
+    const enemies = [], corpses = [];
     function spawnEnemy(name) { const T = TYPES[name]; const g = new THREE.Group();
       const bm = new THREE.MeshStandardMaterial({ color: 0x0c1124, emissive: T.color, emissiveIntensity: 0.55, roughness: 0.5 });
       const body = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 2.2, 10), bm); body.position.y = 1.6; body.castShadow = true; body.userData.part = 'body';
@@ -231,7 +236,7 @@
       const an = Math.random() * 6.283, r = ARENA - 6; g.position.set(Math.cos(an) * r, 0, Math.sin(an) * r); scene.add(g);
       const e = { g, body, head, bm, hp: T.hp, T, atkCD: Math.random() * 0.6, flash: 0, value: T.value, ranged: T.ranged };
       body.userData.enemy = e; head.userData.enemy = e; enemies.push(e); }
-    function killEnemy(e, head) { burst(e.g.position.clone().add(V3(0, 2, 0)), e.T.color, head ? 22 : 14, 11); dropPickup(e.g.position); scene.remove(e.g);
+    function killEnemy(e, head) { burst(e.g.position.clone().add(V3(0, 2, 0)), e.T.color, head ? 22 : 14, 11); dropPickup(e.g.position); corpses.push({ g: e.g, t: 0.6, ax: (Math.random() - 0.5) * 2 });
       const i = enemies.indexOf(e); if (i >= 0) enemies.splice(i, 1); kills++; const pts = e.value + combo * 10; score += pts; combo++; comboT = 2.5;
       P.ks++; if (!P.ksReady && P.ks >= KS_NEED) { P.ksReady = true; banner('AIRSTRIKE READY', 'press F to call it in'); SFX.ks(); }
       feed((head ? '☠ HEADSHOT' : '✚ KILL') + '  +' + pts, head ? '#fff' : '#ffd36e'); SFX.kill(); updateHUD(); }
@@ -325,6 +330,7 @@
 
     // ===================== game state =====================
     function resetGame() { for (const e of enemies.slice()) scene.remove(e.g); enemies.length = 0; for (const n of nades.slice()) scene.remove(n.m); nades.length = 0; for (const p of pickups.slice()) scene.remove(p.m); pickups.length = 0;
+      for (const c of corpses.slice()) scene.remove(c.g); corpses.length = 0;
       rig.position.set(0, STAND, 0); yaw = 0; pitch = 0; vy = 0; recoilP = 0; recoilY = 0; crouch = false; adsP = 0;
       P.hp = 100; P.maxhp = 100; P.dead = false; P.nades = 3; P.ks = 0; P.ksReady = false; resetWeapons();
       score = 0; kills = 0; combo = 0; wave = 0; inBreak = true; breakTimer = 2.0; spawnQueue = []; $('vig').style.opacity = '0'; updateHUD(); }
@@ -414,6 +420,7 @@
         if (hitT > 0) { hitT -= dt; if (hitT <= 0) $('hit').style.opacity = '0'; }
         drawMini();
       }
+      for (const c of corpses.slice()) { c.t -= dt; c.g.rotation.x = lerp(c.g.rotation.x, c.ax > 0 ? 1.5 : -1.5, dt * 6); c.g.position.y = damp(c.g.position.y, -1.4, 4, dt); if (c.t <= 0) { scene.remove(c.g); corpses.splice(corpses.indexOf(c), 1); } }
       for (const p of parts) { if (p.life <= 0) continue; p.life -= dt; p.vel.y -= 22 * dt; p.m.position.addScaledVector(p.vel, dt); p.m.scale.multiplyScalar(1 - dt * 1.5); if (p.life <= 0 || p.m.position.y < 0) p.m.visible = false; }
       renderer.render(scene, camera);
     }
