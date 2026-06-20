@@ -67,7 +67,9 @@ Legend: ✅ implemented & comparable · ⚠️ implemented but simplified · ❌
 | Sky / atmosphere | Procedural gradient skybox + fog | ⚠️ |
 | Detailed weapon viewmodel | Multi-part rifle (receiver/handguard/barrel/stock/grip/mag/sights) + ADS | ⚠️ |
 | Death animations | Enemy topple + sink corpses | ⚠️ |
-| Photoreal PBR art, real gun/character models, mocap animation | procedural primitives only | ❌ |
+| Real rigged + animated 3D enemy models | Loads a real animated GLTF (BrainStem) per enemy via GLTFLoader + SkeletonUtils + AnimationMixer; invisible box hitboxes drive gameplay; falls back to box enemies if the asset can't load | ✅ |
+| Real weapon model | detailed procedural rifle (no sourced gun asset) | ⚠️ |
+| Photoreal PBR environment art, mocap, full character variety | procedural arena + single enemy model | ❌ |
 
 ## What is fundamentally NOT comparable (being honest)
 | Area | Why |

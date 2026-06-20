@@ -125,6 +125,9 @@
   <script src="https://unpkg.com/three@0.137.0/examples/js/postprocessing/ShaderPass.js"></script>
   <script src="https://unpkg.com/three@0.137.0/examples/js/postprocessing/MaskPass.js"></script>
   <script src="https://unpkg.com/three@0.137.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+  <!-- optional: real animated 3D models for enemies (graceful fallback to box enemies) -->
+  <script src="https://unpkg.com/three@0.137.0/examples/js/loaders/GLTFLoader.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/utils/SkeletonUtils.js"></script>
   <script>
   (function () {
     const $ = (id) => document.getElementById(id);
@@ -249,13 +252,34 @@
       shooter:{ hp: 40, speed: 5, dmg: 10, color: 0xa855f7, scale: 1, value: 200, ranged: true },
     };
     const enemies = [], corpses = [];
+    // Optional: load a real rigged+animated model for enemies. If it loads, each
+    // enemy shows the animated model and its box body/head become invisible hitboxes
+    // (opacity 0 — still raycastable). If it fails, enemies stay as the box version.
+    let ENEMY_GLTF = null;
+    (function loadEnemyModel() {
+      if (!THREE.GLTFLoader || !THREE.SkeletonUtils) return;
+      try { new THREE.GLTFLoader().load(
+        'https://cdn.jsdelivr.net/gh/KhronosGroup/glTF-Sample-Models@master/2.0/BrainStem/glTF-Binary/BrainStem.glb',
+        (g) => { ENEMY_GLTF = g; }, undefined, () => { ENEMY_GLTF = null; }); } catch (e) { ENEMY_GLTF = null; }
+    })();
     function spawnEnemy(name) { const T = TYPES[name]; const g = new THREE.Group();
       const bm = new THREE.MeshStandardMaterial({ color: 0x0c1124, emissive: T.color, emissiveIntensity: 0.55, roughness: 0.5 });
       const body = new THREE.Mesh(new THREE.CylinderGeometry(0.7, 0.9, 2.2, 10), bm); body.position.y = 1.6; body.castShadow = true; body.userData.part = 'body';
       const head = new THREE.Mesh(new THREE.SphereGeometry(0.55, 14, 14), new THREE.MeshBasicMaterial({ color: T.color })); head.position.y = 3.1; head.userData.part = 'head';
       g.add(body, head); g.scale.setScalar(T.scale);
       const an = Math.random() * 6.283, r = ARENA - 6; g.position.set(Math.cos(an) * r, 0, Math.sin(an) * r); scene.add(g);
-      const e = { g, body, head, bm, hp: T.hp, T, atkCD: Math.random() * 0.6, flash: 0, value: T.value, ranged: T.ranged };
+      const e = { g, body, head, bm, hp: T.hp, T, atkCD: Math.random() * 0.6, flash: 0, value: T.value, ranged: T.ranged, mixer: null };
+      // swap in a real animated model as the visual; keep boxes as invisible hitboxes
+      if (ENEMY_GLTF) { try {
+        const model = THREE.SkeletonUtils.clone(ENEMY_GLTF.scene);
+        const sz = new THREE.Vector3(); new THREE.Box3().setFromObject(model).getSize(sz);
+        model.scale.setScalar(3.4 / (sz.y || 1));
+        const b2 = new THREE.Box3().setFromObject(model); model.position.y = -b2.min.y;
+        model.traverse((o) => { if (o.isMesh && o.material && !Array.isArray(o.material)) { o.castShadow = true; o.material = o.material.clone(); if ('emissive' in o.material) { o.material.emissive = new THREE.Color(T.color); o.material.emissiveIntensity = 0.35; } } });
+        g.add(model);
+        bm.transparent = true; bm.opacity = 0; head.material.transparent = true; head.material.opacity = 0;
+        if (ENEMY_GLTF.animations && ENEMY_GLTF.animations.length) { e.mixer = new THREE.AnimationMixer(model); e.mixer.clipAction(ENEMY_GLTF.animations[0]).play(); }
+      } catch (err) { bm.transparent = false; bm.opacity = 1; head.material.opacity = 1; } }
       body.userData.enemy = e; head.userData.enemy = e; enemies.push(e); }
     function killEnemy(e, head) { burst(e.g.position.clone().add(V3(0, 2, 0)), e.T.color, head ? 22 : 14, 11); dropPickup(e.g.position); corpses.push({ g: e.g, t: 0.6, ax: (Math.random() - 0.5) * 2 });
       const i = enemies.indexOf(e); if (i >= 0) enemies.splice(i, 1); kills++; const pts = e.value + combo * 10; score += pts; combo++; comboT = 2.5;
@@ -420,7 +444,8 @@
             if (clearLOS(eye, pp.clone())) { SFX.enemyShot(); const ep = etracer.geometry.attributes.position; ep.setXYZ(0, eye.x, eye.y, eye.z); ep.setXYZ(1, pp.x, pp.y - 0.5, pp.z); ep.needsUpdate = true; etracerT = 0.08;
               const acc = 0.45 + Math.min(0.3, wave * 0.02); if (Math.random() < acc) hurt(e.T.dmg, g.position.clone()); } } }
           else if (dist < 3.0 && e.atkCD <= 0) { e.atkCD = 1.0; hurt(e.T.dmg, g.position.clone()); }
-          if (e.flash > 0) { e.flash -= dt; e.bm.emissiveIntensity = e.flash > 0 ? 3 : 0.55; } else e.bm.emissiveIntensity = 0.55; }
+          if (e.flash > 0) { e.flash -= dt; e.bm.emissiveIntensity = e.flash > 0 ? 3 : 0.55; } else e.bm.emissiveIntensity = 0.55;
+          if (e.mixer) e.mixer.update(dt); }
         // grenades
         for (const n of nades.slice()) { n.fuse -= dt; n.vel.y -= 30 * dt; n.m.position.addScaledVector(n.vel, dt);
           if (n.m.position.y < 0.3) { n.m.position.y = 0.3; n.vel.y *= -0.4; n.vel.x *= 0.7; n.vel.z *= 0.7; }
