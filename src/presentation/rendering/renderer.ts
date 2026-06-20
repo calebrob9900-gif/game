@@ -1,4 +1,5 @@
 import * as THREE from 'three/webgpu';
+import type { BotSnapshot } from '../../sim';
 
 /**
  * Renderer bootstrap: WebGPU first, automatic WebGL2 fallback (WebGPURenderer
@@ -71,6 +72,48 @@ export class GameRenderer {
       const ang = (i % 4) * (Math.PI / 2) + ring * 0.4;
       block.position.set(Math.cos(ang) * ring * 8, 2, Math.sin(ang) * ring * 8 - 18);
       this.scene.add(block);
+    }
+  }
+
+  // ── Bot avatars (T-133 visual) ──────────────────────────────────────────
+  private readonly botMeshes: THREE.Mesh[] = [];
+  private botGeo?: THREE.BoxGeometry;
+  private botMat?: THREE.MeshStandardMaterial;
+
+  /**
+   * Sync simple box avatars for the sim's bots from the latest snapshot.
+   * Meshes are pooled and reused frame-to-frame (no per-frame allocation);
+   * surplus meshes are hidden. A bot box is ~0.6×1.8×0.6 m centred on the
+   * body — `bot.position` is the eye point at foot + 1.7 m (matching the sim
+   * hitbox template), so the box centre sits 0.8 m below it to span foot→head.
+   * Dead bots are hidden until they respawn.
+   */
+  syncBots(bots: readonly BotSnapshot[]): void {
+    if (!this.botGeo) {
+      this.botGeo = new THREE.BoxGeometry(0.6, 1.8, 0.6);
+      this.botMat = new THREE.MeshStandardMaterial({
+        color: 0x1a0a12,
+        emissive: new THREE.Color(0xff2d6b),
+        emissiveIntensity: 0.7,
+        roughness: 0.5,
+        metalness: 0.2,
+      });
+    }
+    for (let i = 0; i < bots.length; i++) {
+      let mesh = this.botMeshes[i];
+      if (!mesh) {
+        mesh = new THREE.Mesh(this.botGeo, this.botMat);
+        this.botMeshes[i] = mesh;
+        this.scene.add(mesh);
+      }
+      const b = bots[i]!;
+      mesh.visible = b.alive;
+      mesh.position.set(b.position.x, b.position.y - 0.8, b.position.z);
+    }
+    // Hide any surplus pooled meshes (bot count shrank).
+    for (let i = bots.length; i < this.botMeshes.length; i++) {
+      const m = this.botMeshes[i];
+      if (m) m.visible = false;
     }
   }
 

@@ -1,10 +1,19 @@
-import { CommandBuffer, createWorld, snapshot, step, type Command, type SimWorld } from '../sim';
+import {
+  CommandBuffer,
+  createWorld,
+  snapshot,
+  spawnBot,
+  step,
+  type Command,
+  type SimWorld,
+} from '../sim';
 import { createTestLevel } from '../sim/levels/testLevel';
 import { createMantleTestLevel } from '../sim/levels/mantleTestLevel';
 import { GameRenderer } from '../presentation/rendering/renderer';
 import { RenderSync } from '../presentation/view/renderSync';
 import { Hud, injectHudStyles } from '../presentation/ui/hud';
 import { PointerLook } from '../presentation/input-capture/pointerLook';
+import { KeyboardInput } from '../presentation/input-capture/keyboardInput';
 import { AudioManager } from '../presentation/audio/audioManager';
 import {
   Hitmarker,
@@ -37,8 +46,24 @@ async function main(): Promise<void> {
       ? createTestLevel()
       : scenario === 'mantle_test'
         ? createMantleTestLevel()
-        : null;
+        : scenario === 'play'
+          ? createTestLevel()
+          : null;
   const world: SimWorld = createWorld(seed, undefined, level);
+
+  // ?scenario=play — human-playable sandbox: the walled test arena plus a few
+  // static target bots in front of the spawn (-5,0,0 facing −Z). Bots use
+  // spawnBot so they appear in snapshot.bots and are drawn by renderer.syncBots.
+  if (scenario === 'play') {
+    const targets: ReadonlyArray<readonly [number, number, number]> = [
+      [-5, 0, -8],
+      [-2, 0, -10],
+      [-8, 0, -12],
+      [0, 0, -6],
+      [-5, 0, -14],
+    ];
+    for (const [x, y, z] of targets) spawnBot(world, { x, y, z });
+  }
 
   // T-120: hitmarker_test scenario — three target bots at known positions so the
   // E2E test can fire with precise aim and verify all hitmarker variants.
@@ -113,9 +138,16 @@ async function main(): Promise<void> {
     }
   });
 
+  // Live keyboard movement: sampled once per fixed tick and folded into the
+  // same CommandBuffer the test harness uses (identical sim code path).
+  const keyboard = new KeyboardInput();
+
   renderSync.push(snapshot(world));
 
   const stepSim = (): void => {
+    // Feed held movement keys to this tick. A no-key sample folds to the same
+    // zeroed TickInput as no command, so untouched scenarios are unaffected.
+    commands.push(keyboard.sample());
     step(world, commands.drain());
     renderSync.push(snapshot(world));
   };
@@ -124,9 +156,12 @@ async function main(): Promise<void> {
     stepSim,
     render: (alpha) => {
       renderSync.apply(renderer, alpha);
+      const snap = snapshot(world);
+      // Draw/refresh bot avatars (no-op when there are no bots).
+      renderer.syncBots(snap.bots);
       renderer.render();
       // Update HUD from the current sim snapshot (DOM writes only when values change).
-      hud.update(snapshot(world));
+      hud.update(snap);
       // Sync spatial listener with camera transform each frame.
       // camera.rotation uses YXZ order: yaw = rotation.y, pitch = rotation.x.
       const cam = renderer.camera;
@@ -171,6 +206,15 @@ async function main(): Promise<void> {
 
   // Wire pointer-lock look capture: click canvas → lock, raw mouse → LookCommands.
   const pointerLook = new PointerLook(canvas, commands, { sens: 2.0 });
+
+  // Live fire: left-click while pointer-locked fires one shot (semi-auto — the
+  // sim has no fire-rate gate yet, so we fire per click rather than per tick).
+  // Gated on pointer lock so the initial lock-acquiring click doesn't fire.
+  canvas.addEventListener('mousedown', (e) => {
+    if (e.button === 0 && document.pointerLockElement === canvas) {
+      commands.push({ type: 'fire' });
+    }
+  });
   // Expose audio instrumentation hook (dev/test only, stripped in production).
   // Allows E2E tests to read scheduled sound counts without reading audio state.
   if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
