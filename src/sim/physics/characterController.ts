@@ -304,12 +304,11 @@ export interface PlayerMovementParams {
   /** Jump launch speed (m/s). Tuned for ~1 m apex with gravity 20: sqrt(2*20*1)≈6.3. */
   jumpSpeed: number;
   /**
-   * Per-weapon move speed multiplier (scales maxRunSpeed).
-   * From research/03 §7.1 / §8.2:
-   *   knife/empty = 1.0, AR = 0.85, LMG/sniper = 0.75.
-   * Default 1.0 — must stay 1.0 so existing golden hashes are unaffected.
+   * Per-weapon move speed multiplier (scales maxRunSpeed). Optional: omit (or 1.0)
+   * for no penalty. From research/03 §7.1 / §8.2: knife/empty 1.0, AR 0.85,
+   * LMG/sniper 0.75. Absent ⇒ treated as 1.0 (so existing golden hashes hold).
    */
-  moveMult: number;
+  moveMult?: number;
 }
 
 export const DEFAULT_MOVEMENT_PARAMS: PlayerMovementParams = {
@@ -350,7 +349,10 @@ export function integratePlayer(
   const vel = state.velocity;
 
   // --- Friction (horizontal) — frame-rate-independent exponential decay ---
-  // Stop applying friction if there's wish input (keeps sliding feel)
+  // Applied EVERY grounded tick, independent of wish input. While a key is held,
+  // the high-accel step below restores the target speed; when input is released
+  // OR reversed, this friction decays the carried velocity within a few ticks —
+  // that is the counter-strafe brake (research/03 §7.1).
   const horizSpeed = Math.sqrt(vel.x * vel.x + vel.z * vel.z);
   if (horizSpeed > 0 && state.onGround) {
     // decay factor: 1 - exp(-friction * dt)

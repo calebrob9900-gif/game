@@ -64,11 +64,10 @@ function runWithMoveMult(
   const level = createTestLevel();
   const world = createWorld(seed, DEFAULT_SETTINGS, level);
 
-  if (moveMult !== 1.0) {
-    // Access player entity and set moveMult (Entity.moveMult from world.ts)
-    const playerEnt = world.ecs.with('player').entities[0] as { moveMult?: number };
-    playerEnt.moveMult = moveMult;
-  }
+  // Always set an explicit moveMult (including 1.0) so the golden hash for the
+  // 1.0 case pins the explicit-1.0 path, not the field-absent path.
+  const playerEnt = world.ecs.with('player').entities[0] as { moveMult?: number };
+  playerEnt.moveMult = moveMult;
 
   for (let t = 0; t < totalTicks; t++) {
     step(world, [{ type: 'move', forward: 1, right: 0, jump: false }]);
@@ -124,8 +123,9 @@ describe('T-102 position-curve replay', () => {
     // After 5 no-input ticks from z=-3.0, speed has decayed:
     // v0=6, v5 ≈ 6 * exp(-8*5/60) ≈ 6 * 0.5134 ≈ 3.08
     // distance = integral ≈ -3.0 + (-0.334) ≈ -3.34 (approximate)
-    // Exact value (computed from authoritative run): -3.34114850
-    expect(positions[35]!.z).toBeCloseTo(-3.3411, 2);
+    // Exact value (computed from authoritative run): pinned to 5 decimals so a
+    // friction change is actually caught here (not just by the golden hash).
+    expect(positions[35]!.z).toBeCloseTo(-3.3411485, 5);
   });
 
   it('position-curve scenario is deterministic (literal golden hash)', () => {
@@ -188,10 +188,10 @@ describe('T-102 counter-strafe braking', () => {
     }
 
     // With friction=8 /s (within the 6–10 spec range), speed drops below 1 m/s
-    // in exactly 14 ticks (≈0.23 seconds) from 6 m/s.
-    // This would fail if friction were set to ≤2 /s (would take ≥40+ ticks).
-    expect(ticksBelowOne).toBeGreaterThan(0); // does reach < 1 m/s
-    expect(ticksBelowOne).toBeLessThanOrEqual(14); // does so fast (friction in spec range)
+    // in EXACTLY 14 ticks (≈0.23 s) from 6 m/s. Pinned exactly so a friction
+    // change in either direction fails this assertion (not gameable by any
+    // positive friction the way `>0 && <=14` was).
+    expect(ticksBelowOne).toBe(14);
   });
 
   it('friction params match research/03 §7.1 (6–10 /s range)', () => {
