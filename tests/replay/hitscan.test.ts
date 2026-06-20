@@ -539,11 +539,21 @@ describe('T-111 scripted fire sequence golden hash', () => {
 
   it('scripted fire sequence produces a literal golden hash', () => {
     const r = runFireSequence(12345);
-    // Literal golden hash — re-baseline only via reviewed PR.
-    // Computed from: seed=12345, flat-ground (null level), chest aim,
-    // 5 × fire commands. Health: 100→72.5→45→17.5→0→0. Tick=5.
-    // (T-111 pinned golden: afa4eefa)
-    const GOLDEN = 'afa4eefa';
+    // Literal golden hash — re-baselined in T-112.
+    //
+    // WHY T-111 golden changed with T-112:
+    //   The fire system now applies the weapon recoilPattern to the accumulated aim offset
+    //   and uses that offset when building the hitscan ray (T-112 aim recoil is authoritative
+    //   for bullet direction). The AR_BASELINE pattern has shot 0 = {p:0.0, y:0.0} (no kick),
+    //   but shots 1+ accumulate offsets (e.g. shot 1 = pitch -0.45°). After shot 1 the ray
+    //   is tilted upward by 0.45° — still well within the chest/head hitboxes at 5 m —
+    //   so the target still dies in 4 shots (100→72.5→45→17.5→0). But the recoil state
+    //   fields (recoilPitch, recoilYaw, recoilShot, recoilTicksSinceLastShot) are now
+    //   included in the world hash, producing a different hash than the pre-T-112 value.
+    //
+    // Original T-111 golden: afa4eefa (pre-recoil, no recoil state in hash)
+    // Re-baselined T-112 golden: abe20566 (includes recoil state, same game outcome)
+    const GOLDEN = 'abe20566';
     expect(r.hash).toBe(GOLDEN);
   });
 });

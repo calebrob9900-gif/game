@@ -167,9 +167,15 @@ describe('T-133 head shots kill bot (3 shots)', () => {
    * Shots: 100 → 62.5 → 25 → 0 (dead).
    */
 
-  it('3 head shots kill the bot (health=0, damageable=false)', () => {
+  it('3 accurate head shots kill the bot (recoil recovers between shots)', () => {
+    // With two-layer recoil (T-112), consecutive shots climb off the small head
+    // box — so we tap-fire, letting recoil fully recover between shots, the
+    // correct CoD-style way to land 3 headshots. 3 × 37.5 = 112.5 ≥ 100 HP.
     const world = createBotWorld('head');
-    for (let i = 0; i < 3; i++) step(world, [{ type: 'fire' } as Command]);
+    for (let i = 0; i < 3; i++) {
+      step(world, [{ type: 'fire' } as Command]);
+      for (let t = 0; t < 60; t++) step(world, []); // recover recoil (< RESPAWN_TICKS)
+    }
 
     const bot = world.ecs.entities.find((e) => e.bot)!;
     expect(bot.health).toBe(0);
@@ -315,7 +321,7 @@ describe('T-133 deterministic golden hash', () => {
     // 4 × fire commands → bot dead at tick 4, then 300 idle ticks → bot alive at tick 304.
     // AR chest: damageClose=25 × mult.chest=1.1 = 27.5/shot; 4 shots = 110 dmg ≥ 100 HP.
     // RESPAWN_TICKS = 300 (5 s × 60 Hz). Total = 304 ticks.
-    const GOLDEN = '0f2b177c';
+    const GOLDEN = '00012d45';
     expect(runBotSequence(7331)).toBe(GOLDEN);
   });
 });
@@ -329,7 +335,7 @@ describe('T-133 existing goldens unaffected by bot stub', () => {
    * non-bot entities), so the player entity hash is unchanged.
    */
 
-  it('hitscan golden afa4eefa is unchanged (5-shot chest sequence, seed=12345)', () => {
+  it('hitscan golden re-baselined to abe20566 by T-112 recoil (firing now offsets by recoil) (5-shot chest sequence, seed=12345)', () => {
     const TARGET_FOOT = { x: 0, y: 0, z: -5 };
     const rh = STANDING_HITBOX_TEMPLATE.find((r) => r.region === 'chest')!;
     const regionCenterY = TARGET_FOOT.y + rh.aabb.center.y;
@@ -352,6 +358,6 @@ describe('T-133 existing goldens unaffected by bot stub', () => {
 
     for (let i = 0; i < 5; i++) step(world, [{ type: 'fire' } as Command]);
 
-    expect(hashWorld(world)).toBe('afa4eefa');
+    expect(hashWorld(world)).toBe('abe20566');
   });
 });

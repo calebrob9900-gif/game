@@ -72,6 +72,32 @@ export interface PlayerSnapshot {
    * Remaining mantle ticks (T-105). 0 when not mantling.
    */
   mantleTicksLeft: number;
+  // ── Recoil snapshot fields (T-112) ──────────────────────────────────────────
+  /**
+   * Accumulated aim-recoil pitch offset (radians). Presentation MAY add this to
+   * camera pitch for an "aim-follows-pattern" debug view, but the authoritative
+   * use is in the sim's hitscan ray. Exposed here for HUD/debug overlay.
+   */
+  recoilPitch: number;
+  /**
+   * Accumulated aim-recoil yaw offset (radians). Same semantics as recoilPitch.
+   */
+  recoilYaw: number;
+  /**
+   * Visual-kick pitch (radians) — recoverable camera punch for the viewmodel/camera.
+   * Does NOT affect bullet direction. Presentation applies this as extra camera rotation
+   * then removes it as it recovers toward zero.
+   */
+  visualKickPitch: number;
+  /**
+   * Visual-kick yaw (radians). Same semantics as visualKickPitch.
+   */
+  visualKickYaw: number;
+  /**
+   * Shots in current burst (0-indexed). 0 means no active burst (or just started).
+   * Useful for debug HUD or crosshair bloom.
+   */
+  recoilShot: number;
 }
 
 export interface Snapshot {
@@ -129,6 +155,12 @@ export function snapshot(world: SimWorld): Snapshot {
       slideTicksLeft: p.slideTicksLeft ?? 0,
       isMantling,
       mantleTicksLeft: p.mantleTicksLeft ?? 0,
+      // Recoil state (T-112)
+      recoilPitch: p.recoilPitch ?? 0,
+      recoilYaw: p.recoilYaw ?? 0,
+      visualKickPitch: p.visualKickPitch ?? 0,
+      visualKickYaw: p.visualKickYaw ?? 0,
+      recoilShot: p.recoilShot ?? 0,
     },
     bots,
   };
