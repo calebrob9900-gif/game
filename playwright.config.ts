@@ -45,5 +45,6 @@ export default defineConfig({
       testMatch: /tests\/visual\/.*\.spec\.ts$/,
       use: { viewport: { width: 1280, height: 720 } },
     },
+    { name: 'perf', testMatch: /tests\/perf\/.*\.spec\.ts$/ },
   ],
 });

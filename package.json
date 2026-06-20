@@ -16,7 +16,7 @@
     "test:watch": "vitest",
     "test:e2e": "playwright test --project=e2e",
     "test:visual": "playwright test --project=visual",
-    "test:perf": "node scripts/perf.mjs",
+    "test:perf": "node scripts/perf-budget.mjs && playwright test --project=perf",
     "verify": "bash scripts/verify.sh"
   },
   "dependencies": {
