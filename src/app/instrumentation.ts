@@ -26,7 +26,10 @@ declare global {
 
 /** Returns a `markReady` setter the bootstrap calls once the first frame renders. */
 export function installInstrumentation(api: Instrumentation): (ready: boolean) => void {
-  if (!import.meta.env.DEV) {
+  // Present in dev AND in test builds (`vite build --mode test`, served via
+  // `vite preview` for E2E/visual/perf), but STRIPPED from the real production
+  // build (mode 'production') so the hooks never ship.
+  if (!import.meta.env.DEV && import.meta.env.MODE !== 'test') {
     return () => {};
   }
   const w = window;

@@ -1,11 +1,10 @@
 import { defineConfig } from 'vite';
 
-// GitHub Pages serves this repo under /game/. Use that base only in CI/build,
-// '/' locally so the dev server and Playwright work at the root.
-const base = process.env.GITHUB_ACTIONS ? '/game/' : '/';
-
-export default defineConfig({
-  base,
+// GitHub Pages serves this repo under /game/. Use that base only for the real
+// production build in CI; '/' otherwise (dev, and the `--mode test` bundle the
+// Playwright webServer previews, which is served at the root).
+export default defineConfig(({ mode }) => ({
+  base: process.env.GITHUB_ACTIONS && mode !== 'test' ? '/game/' : '/',
   build: {
     target: 'es2022',
     sourcemap: true,
@@ -19,4 +18,4 @@ export default defineConfig({
       },
     },
   },
-});
+}));
