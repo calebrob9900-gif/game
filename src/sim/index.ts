@@ -14,3 +14,23 @@ export { CommandBuffer, foldCommands, emptyTickInput } from './input/commands';
 export type { Command, MoveCommand, LookCommand, TickInput } from './input/commands';
 export * as vec from './core/vec';
 export type { Vec3 } from './core/vec';
+
+// Level descriptor
+export type { LevelDescriptor, BoxCollider, SpawnPoint } from './levels/levelDescriptor';
+export { validateLevel } from './levels/levelDescriptor';
+export { createTestLevel } from './levels/testLevel';
+
+// Physics / character controller
+export {
+  moveAndResolve,
+  integratePlayer,
+  resolveCapsuleVsBox,
+  PLAYER_CAPSULE,
+  STEP_HEIGHT,
+  DEFAULT_MOVEMENT_PARAMS,
+} from './physics/characterController';
+export type {
+  CapsuleShape,
+  ControllerState,
+  PlayerMovementParams,
+} from './physics/characterController';

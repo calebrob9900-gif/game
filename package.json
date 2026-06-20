@@ -14,9 +14,9 @@
     "typecheck": "tsc --noEmit",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:e2e": "playwright test --project=e2e",
-    "test:visual": "playwright test --project=visual",
-    "test:perf": "node scripts/perf-budget.mjs && playwright test --project=perf",
+    "test:e2e": "PW_PORT=4173 playwright test --project=e2e",
+    "test:visual": "PW_PORT=4174 playwright test --project=visual",
+    "test:perf": "node scripts/perf-budget.mjs && PW_PORT=4175 playwright test --project=perf",
     "verify": "bash scripts/verify.sh"
   },
   "dependencies": {

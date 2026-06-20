@@ -45,7 +45,9 @@ describe('deterministic replay', () => {
   it('matches the committed GOLDEN world hash (re-baseline is a reviewed act)', () => {
     // Pins the exact end-state of the recorded scenario. A change here means a
     // deliberate gameplay/physics change — re-baseline only via reviewed PR.
-    const GOLDEN = '968e8e8b';
+    // Re-baselined for T-101: capsule controller replaced flat-ground clamp.
+    // Old hash: 968e8e8b (flat-ground), new hash: b9debaa4 (capsule+AABB model).
+    const GOLDEN = 'b9debaa4';
     expect(runReplay(SCENARIO).hash).toBe(GOLDEN);
   });
 
