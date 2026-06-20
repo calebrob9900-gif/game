@@ -13,23 +13,23 @@
 
 ## PHASE 0 — Foundation & verification harness
 
-- [ ] T-001 Init `package.json`, Vite, TypeScript (strict), `index.html` + `src/app/main.ts` — acceptance: `pnpm dev` serves, `pnpm build` bundles. [V1]
-- [ ] T-002 ESLint + Prettier + `tsc --noEmit` + **import-boundary rule** (`presentation`→`sim` only) — acceptance: a `three` import in `src/sim` fails lint. [V1]
-- [ ] T-003 Deps: three, @dimforge/rapier3d-compat, miniplex, howler, recast-navigation-js, yuka; dev: vitest, fast-check, @playwright/test, lighthouse, memlab. Vendor three or allowlist CDN. — acceptance: install clean; app imports three error-free. [V1]
-- [ ] T-004 Real `scripts/verify.sh` chaining V1–V5 (each a step, aggregate exit), wired to pnpm scripts. — acceptance: exits 0 on the scaffold; prints per-verifier summary. [V1–V5]
-- [ ] T-005 `.github/workflows/ci.yml`: install→verify on PR/push; required `ci-passed` aggregator; Pages deploy on green. — acceptance: CI green on scaffold. [V1]
-- [ ] T-006 Confirm `.claude/` machinery committed (agents, settings, SessionStart hook works). — acceptance: hook runs; agents valid. [V1]
-- [ ] T-007 `perf-budgets.json` (p95 ≤16.6ms, draw calls <100, bundle/asset/memory budgets). — acceptance: parses; V5 reads it. [V5]
-- [ ] T-010 Fixed-timestep loop (60Hz) + interpolated render + frame-time clamp. — acceptance: replay: same inputs ⇒ identical tick count + hash twice. [V2]
-- [ ] T-011 Seeded PRNG in sim; ban `Math.random()`/`Date.now()` in `src/sim` (lint). — acceptance: lint blocks it; reproducible. [V1][V2]
-- [ ] T-012 miniplex ECS + ordered SystemRunner + typed event bus. — acceptance: unit tests for queries + order. [V2]
-- [ ] T-013 `hashWorld(state)` over gameplay state. — acceptance: stable, changes on change, unit-tested. [V2]
-- [ ] T-014 Command/input types + buffer applied at tick boundaries. — acceptance: deterministic replay. [V2]
-- [ ] T-015 Sim/presentation split + read-only snapshot + `RenderSync` interpolation. — acceptance: import-boundary green. [V1]
-- [ ] T-016 Instrumentation contract (`__GAME_READY__/__GAME_STATE__/__perf/__pushCommand/__stepTo/?seed/?scenario`), stripped from prod. — acceptance: present dev/test, absent prod. [V1][V3]
-- [ ] T-017 Renderer bootstrap: WebGPU + WebGL2 fallback; lit "hello scene". — acceptance: E2E loads, `__GAME_READY__`, no console errors, non-blank frame. [V3]
-- [ ] T-018 First visual baseline (frozen frame) committed. — acceptance: V4 matches in pinned image. [V4]
-- [ ] T-019 Perf probe + Lighthouse CI wired. — acceptance: V5 runs, passes initial budgets. [V5]
+- [x] T-001 Init `package.json`, Vite, TypeScript (strict), `index.html` + `src/app/main.ts` — acceptance: `pnpm dev` serves, `pnpm build` bundles. [V1] — 316f2b7
+- [x] T-002 ESLint + Prettier + `tsc --noEmit` + **import-boundary rule** (`presentation`→`sim` only) — acceptance: a `three` import in `src/sim` fails lint. [V1] — 316f2b7 (proven: `three`+`Math.random`+`Date.now` in sim ⇒ 4 eslint errors, exit 1)
+- [x] T-003 Deps: three, @dimforge/rapier3d-compat, miniplex, howler, recast-navigation-js, yuka; dev: vitest, fast-check, @playwright/test, lighthouse, memlab. Vendor three or allowlist CDN. — acceptance: install clean; app imports three error-free. [V1] — 316f2b7 (npm registry allowlisted; pkg name `recast-navigation`)
+- [x] T-004 Real `scripts/verify.sh` chaining V1–V5 (each a step, aggregate exit), wired to pnpm scripts. — acceptance: exits 0 on the scaffold; prints per-verifier summary. [V1–V5] — 316f2b7
+- [ ] T-005 `.github/workflows/ci.yml`: install→verify on PR/push; required `ci-passed` aggregator; Pages deploy on green. — acceptance: CI green on scaffold. [V1] — workflow committed (316f2b7); awaiting first CI run to confirm green
+- [x] T-006 Confirm `.claude/` machinery committed (agents, settings, SessionStart hook works). — acceptance: hook runs; agents valid. [V1] — 316f2b7 (SessionStart hook ran this session; 4 agents valid)
+- [x] T-007 `perf-budgets.json` (p95 ≤16.6ms, draw calls <100, bundle/asset/memory budgets). — acceptance: parses; V5 reads it. [V5] — 316f2b7
+- [x] T-010 Fixed-timestep loop (60Hz) + interpolated render + frame-time clamp. — acceptance: replay: same inputs ⇒ identical tick count + hash twice. [V2] — 316f2b7
+- [x] T-011 Seeded PRNG in sim; ban `Math.random()`/`Date.now()` in `src/sim` (lint). — acceptance: lint blocks it; reproducible. [V1][V2] — 316f2b7
+- [x] T-012 miniplex ECS + ordered SystemRunner + typed event bus. — acceptance: unit tests for queries + order. [V2] — 316f2b7
+- [x] T-013 `hashWorld(state)` over gameplay state. — acceptance: stable, changes on change, unit-tested. [V2] — 316f2b7 (+ golden-hash pin `968e8e8b`)
+- [x] T-014 Command/input types + buffer applied at tick boundaries. — acceptance: deterministic replay. [V2] — 316f2b7
+- [x] T-015 Sim/presentation split + read-only snapshot + `RenderSync` interpolation. — acceptance: import-boundary green. [V1] — 316f2b7
+- [x] T-016 Instrumentation contract (`__GAME_READY__/__GAME_STATE__/__perf/__pushCommand/__stepTo/?seed/?scenario`), stripped from prod. — acceptance: present dev/test, absent prod. [V1][V3] — 316f2b7 (grep of prod dist = 0 occurrences)
+- [x] T-017 Renderer bootstrap: WebGPU + WebGL2 fallback; lit "hello scene". — acceptance: E2E loads, `__GAME_READY__`, no console errors, non-blank frame. [V3] — 316f2b7 (headless SwiftShader ⇒ WebGL2 backend)
+- [x] T-018 First visual baseline (frozen frame) committed. — acceptance: V4 matches in pinned image. [V4] — 316f2b7
+- [x] T-019 Perf probe + Lighthouse CI wired. — acceptance: V5 runs, passes initial budgets. [V5] — 316f2b7 (Lighthouse via lighthouserc.json/CI; local V5 gates bundle+sim-CPU+liveness)
 
 **EXIT GATE P0:** `verify.sh` green (V1–V5) on a minimal real app; CI green; deployed to Pages; one replay test + one visual baseline + one perf run pass.
 
@@ -173,5 +173,5 @@
 ---
 
 ## Progress
-- P0: 0/19 · P1: 0/22 · P2: 0/10 · P3: 0/14 · P4: 0/5 · P5: 0/7 · P6: 0/16 · P7: 0/8 · P8: 0/8 (deferred)
+- P0: 18/19 (T-005 awaiting CI-green confirmation) · P1: 0/22 · P2: 0/10 · P3: 0/14 · P4: 0/5 · P5: 0/7 · P6: 0/16 · P7: 0/8 · P8: 0/8 (deferred)
 - Update counts as boxes flip. v1 is done when **P0–P7 are fully `[x]`** and the v1 ship gate passes (`GOAL.md`).

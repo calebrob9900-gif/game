@@ -42,6 +42,13 @@ describe('deterministic replay', () => {
     expect(a.hash).toBe(b.hash);
   });
 
+  it('matches the committed GOLDEN world hash (re-baseline is a reviewed act)', () => {
+    // Pins the exact end-state of the recorded scenario. A change here means a
+    // deliberate gameplay/physics change — re-baseline only via reviewed PR.
+    const GOLDEN = '968e8e8b';
+    expect(runReplay(SCENARIO).hash).toBe(GOLDEN);
+  });
+
   it('produces a different hash for a different seed', () => {
     const a = runReplay(SCENARIO);
     const b = runReplay({ ...SCENARIO, seed: SCENARIO.seed + 1 });
