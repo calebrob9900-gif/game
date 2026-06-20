@@ -17,7 +17,7 @@
 - [x] T-002 ESLint + Prettier + `tsc --noEmit` + **import-boundary rule** (`presentation`→`sim` only) — acceptance: a `three` import in `src/sim` fails lint. [V1] — 316f2b7 (proven: `three`+`Math.random`+`Date.now` in sim ⇒ 4 eslint errors, exit 1)
 - [x] T-003 Deps: three, @dimforge/rapier3d-compat, miniplex, howler, recast-navigation-js, yuka; dev: vitest, fast-check, @playwright/test, lighthouse, memlab. Vendor three or allowlist CDN. — acceptance: install clean; app imports three error-free. [V1] — 316f2b7 (npm registry allowlisted; pkg name `recast-navigation`)
 - [x] T-004 Real `scripts/verify.sh` chaining V1–V5 (each a step, aggregate exit), wired to pnpm scripts. — acceptance: exits 0 on the scaffold; prints per-verifier summary. [V1–V5] — 316f2b7
-- [ ] T-005 `.github/workflows/ci.yml`: install→verify on PR/push; required `ci-passed` aggregator; Pages deploy on green. — acceptance: CI green on scaffold. [V1] — workflow committed (316f2b7); awaiting first CI run to confirm green
+- [x] T-005 `.github/workflows/ci.yml`: install→verify on PR/push; required `ci-passed` aggregator; Pages deploy on green. — acceptance: CI green on scaffold. [V1] — 316f2b7 (CI run #15 on c7ae498 = SUCCESS with the Node static-server webServer; ci-passed green). Pages deploy job runs on merge to main (T-707).
 - [x] T-006 Confirm `.claude/` machinery committed (agents, settings, SessionStart hook works). — acceptance: hook runs; agents valid. [V1] — 316f2b7 (SessionStart hook ran this session; 4 agents valid)
 - [x] T-007 `perf-budgets.json` (p95 ≤16.6ms, draw calls <100, bundle/asset/memory budgets). — acceptance: parses; V5 reads it. [V5] — 316f2b7
 - [x] T-010 Fixed-timestep loop (60Hz) + interpolated render + frame-time clamp. — acceptance: replay: same inputs ⇒ identical tick count + hash twice. [V2] — 316f2b7
@@ -173,5 +173,5 @@
 ---
 
 ## Progress
-- P0: 18/19 (T-005 awaiting CI-green confirmation) · P1: 9/22 (T-101..T-105, T-110, T-111, T-130, T-132) · P2: 0/10 · P3: 0/14 · P4: 0/5 · P5: 0/7 · P6: 0/16 · P7: 0/8 · P8: 0/8 (deferred)
+- P0: 19/19 ✓ (CI green, run #15) · P1: 9/22 (T-101..T-105, T-110, T-111, T-130, T-132) · P2: 0/10 · P3: 0/14 · P4: 0/5 · P5: 0/7 · P6: 0/16 · P7: 0/8 · P8: 0/8 (deferred)
 - Update counts as boxes flip. v1 is done when **P0–P7 are fully `[x]`** and the v1 ship gate passes (`GOAL.md`).
