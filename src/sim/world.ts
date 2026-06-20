@@ -13,6 +13,9 @@ import {
   type ControllerState,
   type PlayerMovementParams,
 } from './physics/characterController';
+import { getWeapon } from './weapons/weapons';
+import { fireHitscan } from './combat/hitscan';
+import type { HitRegion } from './combat/hitbox';
 
 // ── Re-export crouch constants so tests can import them from sim ───────────────
 export { EYE_HEIGHT_STAND, EYE_HEIGHT_CROUCH, CROUCH_SPEED_MULT };
@@ -85,6 +88,19 @@ export interface Entity {
    * From research/03 §7.3.
    */
   isCrouched?: boolean;
+  /**
+   * Current weapon id (must exist in WEAPON_REGISTRY).
+   * Defaults to 'ar_baseline' for the player entity.
+   * Used by the combat/fire system in world.step().
+   */
+  weaponId?: string;
+  /**
+   * Whether this entity can receive damage (is a valid hitscan target).
+   * Entities with health defined are damageable; this flag is optional and
+   * only needs to be set to make intent explicit in tests / bot setup.
+   * The fire system tests `health !== undefined` as the actual gate.
+   */
+  damageable?: boolean;
 }
 
 export interface SimSettings {
@@ -114,6 +130,18 @@ export const DEFAULT_SETTINGS: SimSettings = {
 export interface GameEvents extends Record<string, unknown> {
   tick: { tick: number };
   jump: { tick: number };
+  /**
+   * Emitted when a hitscan shot registers a hit on a target.
+   * Payload includes:
+   *   targetIndex — index in world.ecs.entities
+   *   region      — the body region that was struck
+   *   amount      — damage applied (damageClose × mult[region])
+   */
+  hit: {
+    targetIndex: number;
+    region: HitRegion;
+    amount: number;
+  };
 }
 
 export interface SimWorld {
@@ -140,13 +168,15 @@ export function createWorld(
 
   ecs.add({
     player: true,
-    // Position stored as foot position; eye height is an offset in presentation
+    // Position stored as eye position (foot + eyeHeight); see world.ts comment
     position: vec3(spawnPos.x, spawnPos.y + settings.eyeHeight, spawnPos.z),
     velocity: vec3(0, 0, 0),
     yaw: spawnYaw,
     pitch: 0,
     onGround: true,
     health: 100,
+    // Default weapon for the player (T-111: hitscan fire system)
+    weaponId: 'ar_baseline',
   });
   return {
     ecs,
@@ -365,6 +395,57 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
       p.isCrouched = isCrouchedFlat;
     }
   }
+
+  // --- combat/fire -----------------------------------------------------------
+  // Process a FireCommand this tick if:
+  //   1. input.fire is set (a FireCommand was queued this tick)
+  //   2. canFire is true (not sprinting and not in sprint-out window)
+  //   3. The player has a weaponId set
+  //
+  // canFire derivation (mirrors snapshot.ts):
+  //   isSprinting = p.isSprinting ?? false
+  //   sprintOutUntilTick = p.sprintOutUntilTick ?? 0
+  //   canFire = !isSprinting && world.tick >= sprintOutUntilTick
+  //
+  // NOTE: world.tick has NOT yet incremented at this point.
+  if (input.fire) {
+    const isSprinting = p.isSprinting ?? false;
+    const sprintOutUntilTick = p.sprintOutUntilTick ?? 0;
+    // Use world.tick + 1 for canFire check because the tick increment happens
+    // below — this tick's snapshot tick will be world.tick + 1.
+    const canFire = !isSprinting && world.tick + 1 > sprintOutUntilTick;
+
+    if (canFire && p.weaponId !== undefined) {
+      const weapon = getWeapon(p.weaponId);
+      // Construct a typed shooter context with non-optional yaw/pitch/position
+      const shooter = {
+        position: p.position,
+        yaw: p.yaw ?? 0,
+        pitch: p.pitch ?? 0,
+        player: p.player,
+      };
+      const hit = fireHitscan(world, shooter, weapon);
+
+      if (hit !== null) {
+        const target = world.ecs.entities[hit.targetIndex];
+        if (target && target.health !== undefined) {
+          // Damage = damageClose × region multiplier (research/03 §5.3)
+          const multKey = hit.region; // 'head' | 'chest' | 'stomach' | 'limb'
+          const mult = weapon.mult[multKey];
+          const dmg = weapon.damageClose * mult;
+          // Apply damage (clamp to 0)
+          target.health = Math.max(0, target.health - dmg);
+          // Emit hit event (presentation/effects can react to this)
+          world.events.emit('hit', {
+            targetIndex: hit.targetIndex,
+            region: hit.region,
+            amount: dmg,
+          });
+        }
+      }
+    }
+  }
+  // --- end combat/fire -------------------------------------------------------
 
   world.tick += 1;
   world.events.emit('tick', { tick: world.tick });

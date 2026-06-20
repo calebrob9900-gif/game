@@ -23,7 +23,7 @@ export { SystemRunner, defineSystem, World } from './core/ecs';
 export type { System } from './core/ecs';
 export { EventBus } from './core/events';
 export { CommandBuffer, foldCommands, emptyTickInput } from './input/commands';
-export type { Command, MoveCommand, LookCommand, TickInput } from './input/commands';
+export type { Command, MoveCommand, LookCommand, FireCommand, TickInput } from './input/commands';
 export * as vec from './core/vec';
 export type { Vec3 } from './core/vec';
 
@@ -64,3 +64,9 @@ export type {
 } from './weapons/weaponDef';
 export { fireInterval, validateWeapon } from './weapons/weaponDef';
 export { AR_BASELINE, WEAPON_REGISTRY, getWeapon, ttkBody } from './weapons/weapons';
+
+// Combat — hitscan + hitboxes + region damage multipliers (T-111)
+export type { HitRegion, AABB, RegionHitbox } from './combat/hitbox';
+export { buildHitboxes, STANDING_HITBOX_TEMPLATE } from './combat/hitbox';
+export type { RayHitResult, HitscanHit } from './combat/hitscan';
+export { rayVsAABB, raycastHitboxes, fireHitscan } from './combat/hitscan';
