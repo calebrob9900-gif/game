@@ -1,5 +1,6 @@
 import type { Vec3 } from './core/vec';
 import { getPlayer, type SimWorld } from './world';
+import { EYE_HEIGHT_STAND, EYE_HEIGHT_CROUCH } from './physics/characterController';
 
 /**
  * Immutable read-only projection of sim state for presentation + tests.
@@ -29,6 +30,18 @@ export interface PlayerSnapshot {
    * Equals: !(isSprinting || world.tick < sprintOutUntilTick)
    */
   canFire: boolean;
+  /**
+   * Whether the player is currently crouched.
+   * Presentation uses this to lower the camera and adjust stance.
+   * Added for T-104. False when not crouched.
+   */
+  isCrouched: boolean;
+  /**
+   * Current eye height above foot position (m).
+   * EYE_HEIGHT_STAND (1.7) when standing, EYE_HEIGHT_CROUCH (1.0) when crouched.
+   * Presentation uses this to position the camera.
+   */
+  eyeHeight: number;
 }
 
 export interface Snapshot {
@@ -42,6 +55,8 @@ export function snapshot(world: SimWorld): Snapshot {
   const sprintOutUntilTick = p.sprintOutUntilTick ?? 0;
   // canFire is false while sprinting OR while the sprint-out window is active.
   const canFire = !isSprinting && world.tick >= sprintOutUntilTick;
+  const isCrouched = p.isCrouched ?? false;
+  const eyeHeight = isCrouched ? EYE_HEIGHT_CROUCH : EYE_HEIGHT_STAND;
   return {
     tick: world.tick,
     player: {
@@ -54,6 +69,8 @@ export function snapshot(world: SimWorld): Snapshot {
       isSprinting,
       sprintOutUntilTick,
       canFire,
+      isCrouched,
+      eyeHeight,
     },
   };
 }

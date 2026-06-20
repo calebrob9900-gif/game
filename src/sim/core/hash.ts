@@ -60,6 +60,9 @@ function foldEntity(h: number, e: Entity): number {
   if (e.wasTacSprinting !== undefined) h = foldStr(h, e.wasTacSprinting ? 'T' : 't');
   if (e.sprintOutUntilTick !== undefined && e.sprintOutUntilTick > 0)
     h = foldNumber(h, e.sprintOutUntilTick);
+  // Crouch state — only hashed when present (same pattern as sprint fields above),
+  // so scenarios with no crouch input produce identical hashes to pre-T-104.
+  if (e.isCrouched !== undefined) h = foldStr(h, e.isCrouched ? 'C' : 'c');
   return h;
 }
 

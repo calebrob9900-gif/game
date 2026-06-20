@@ -24,6 +24,12 @@ export interface SpawnPoint {
   readonly position: Vec3;
   /** Yaw angle in radians (0 = facing -Z). */
   readonly yaw: number;
+  /**
+   * Optional team label. When present, the spawn belongs to that team.
+   * Examples: "alpha", "bravo", "neutral". Absent = neutral/any-team.
+   * Backward-compatible: existing SpawnPoints without this field are unaffected.
+   */
+  readonly team?: string;
 }
 
 /**
@@ -42,19 +48,25 @@ export interface LevelDescriptor {
 }
 
 /**
- * Validate that a LevelDescriptor has at least one collider and one spawn.
- * Throws on invalid input (useful in tests and level loading).
+ * Validate a LevelDescriptor and return an array of error strings.
+ * An empty array means the descriptor is valid.
+ * Non-throwing so callers can decide whether to throw, log, or accumulate errors.
  */
-export function validateLevel(desc: LevelDescriptor): void {
+export function validateLevel(desc: LevelDescriptor): string[] {
+  const errors: string[] = [];
   if (desc.colliders.length === 0) {
-    throw new Error(`Level "${desc.name}": must have at least one collider`);
+    errors.push(`Level "${desc.name}": must have at least one collider`);
   }
   if (desc.spawns.length === 0) {
-    throw new Error(`Level "${desc.name}": must have at least one spawn point`);
+    errors.push(`Level "${desc.name}": must have at least one spawn point`);
   }
-  for (const c of desc.colliders) {
+  for (let i = 0; i < desc.colliders.length; i++) {
+    const c = desc.colliders[i]!;
     if (c.half.x <= 0 || c.half.y <= 0 || c.half.z <= 0) {
-      throw new Error(`Level "${desc.name}": collider half-extents must be positive`);
+      errors.push(
+        `Level "${desc.name}": collider[${i}] half-extents must be positive (got ${JSON.stringify(c.half)})`,
+      );
     }
   }
+  return errors;
 }

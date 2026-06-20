@@ -1,0 +1,215 @@
+{
+  "name": "urban01",
+  "units": "meters",
+  "bounds": {
+    "min": { "x": -42, "y": -1, "z": -42 },
+    "max": { "x": 42, "y": 20, "z": 42 }
+  },
+  "colliders": [
+    {
+      "comment": "Ground plane — 84×84 m, 1 m thick, top surface at y=0",
+      "center": { "x": 0, "y": -0.5, "z": 0 },
+      "half": { "x": 42, "y": 0.5, "z": 42 }
+    },
+    {
+      "comment": "North perimeter wall",
+      "center": { "x": 0, "y": 4, "z": -41 },
+      "half": { "x": 42, "y": 5, "z": 1 }
+    },
+    {
+      "comment": "South perimeter wall",
+      "center": { "x": 0, "y": 4, "z": 41 },
+      "half": { "x": 42, "y": 5, "z": 1 }
+    },
+    {
+      "comment": "West perimeter wall",
+      "center": { "x": -41, "y": 4, "z": 0 },
+      "half": { "x": 1, "y": 5, "z": 42 }
+    },
+    {
+      "comment": "East perimeter wall",
+      "center": { "x": 41, "y": 4, "z": 0 },
+      "half": { "x": 1, "y": 5, "z": 42 }
+    },
+    {
+      "comment": "Left lane: west building block A (south half) — forms left lane west wall",
+      "center": { "x": -20, "y": 3.5, "z": -10 },
+      "half": { "x": 8, "y": 3.5, "z": 10 }
+    },
+    {
+      "comment": "Left lane: west building block B (north half) — forms left lane west wall",
+      "center": { "x": -20, "y": 3.5, "z": 12 },
+      "half": { "x": 8, "y": 3.5, "z": 8 }
+    },
+    {
+      "comment": "Right lane: east building block A (south half) — forms right lane east wall",
+      "center": { "x": 20, "y": 3.5, "z": -10 },
+      "half": { "x": 8, "y": 3.5, "z": 10 }
+    },
+    {
+      "comment": "Right lane: east building block B (north half) — forms right lane east wall",
+      "center": { "x": 20, "y": 3.5, "z": 12 },
+      "half": { "x": 8, "y": 3.5, "z": 8 }
+    },
+    {
+      "comment": "Mid lane: central landmark/divider building (south block)",
+      "center": { "x": 0, "y": 4, "z": -8 },
+      "half": { "x": 5, "y": 4, "z": 6 }
+    },
+    {
+      "comment": "Mid lane: central landmark/divider building (north block)",
+      "center": { "x": 0, "y": 4, "z": 10 },
+      "half": { "x": 5, "y": 4, "z": 4 }
+    },
+    {
+      "comment": "Left lane: connector block linking left and mid lanes (south side)",
+      "center": { "x": -10, "y": 2, "z": -22 },
+      "half": { "x": 3, "y": 2, "z": 4 }
+    },
+    {
+      "comment": "Right lane: connector block linking right and mid lanes (south side)",
+      "center": { "x": 10, "y": 2, "z": -22 },
+      "half": { "x": 3, "y": 2, "z": 4 }
+    },
+    {
+      "comment": "Left lane: connector block linking left and mid lanes (north side)",
+      "center": { "x": -10, "y": 2, "z": 22 },
+      "half": { "x": 3, "y": 2, "z": 4 }
+    },
+    {
+      "comment": "Right lane: connector block linking right and mid lanes (north side)",
+      "center": { "x": 10, "y": 2, "z": 22 },
+      "half": { "x": 3, "y": 2, "z": 4 }
+    },
+    {
+      "comment": "Cover: low wall / chest-high crate, left lane south — half-height (1.1 m)",
+      "center": { "x": -14, "y": 0.55, "z": -30 },
+      "half": { "x": 2.5, "y": 0.55, "z": 0.5 }
+    },
+    {
+      "comment": "Cover: low wall, left lane north — half-height",
+      "center": { "x": -14, "y": 0.55, "z": 30 },
+      "half": { "x": 2.5, "y": 0.55, "z": 0.5 }
+    },
+    {
+      "comment": "Cover: low wall, right lane south — half-height",
+      "center": { "x": 14, "y": 0.55, "z": -30 },
+      "half": { "x": 2.5, "y": 0.55, "z": 0.5 }
+    },
+    {
+      "comment": "Cover: low wall, right lane north — half-height",
+      "center": { "x": 14, "y": 0.55, "z": 30 },
+      "half": { "x": 2.5, "y": 0.55, "z": 0.5 }
+    },
+    {
+      "comment": "Cover: full-height wall left of mid south — hides standing player",
+      "center": { "x": -6, "y": 1.2, "z": -32 },
+      "half": { "x": 0.5, "y": 1.2, "z": 2 }
+    },
+    {
+      "comment": "Cover: full-height wall right of mid south",
+      "center": { "x": 6, "y": 1.2, "z": -32 },
+      "half": { "x": 0.5, "y": 1.2, "z": 2 }
+    },
+    {
+      "comment": "Cover: full-height wall left of mid north",
+      "center": { "x": -6, "y": 1.2, "z": 32 },
+      "half": { "x": 0.5, "y": 1.2, "z": 2 }
+    },
+    {
+      "comment": "Cover: full-height wall right of mid north",
+      "center": { "x": 6, "y": 1.2, "z": 32 },
+      "half": { "x": 0.5, "y": 1.2, "z": 2 }
+    },
+    {
+      "comment": "Cover: mid crate cluster A — low cover mid-map west",
+      "center": { "x": -8, "y": 0.6, "z": 0 },
+      "half": { "x": 1.5, "y": 0.6, "z": 1.5 }
+    },
+    {
+      "comment": "Cover: mid crate cluster B — low cover mid-map east",
+      "center": { "x": 8, "y": 0.6, "z": 0 },
+      "half": { "x": 1.5, "y": 0.6, "z": 1.5 }
+    },
+    {
+      "comment": "Cover: barrier block mid north flank",
+      "center": { "x": 0, "y": 1, "z": 20 },
+      "half": { "x": 2, "y": 1, "z": 0.5 }
+    },
+    {
+      "comment": "Cover: barrier block mid south flank",
+      "center": { "x": 0, "y": 1, "z": -20 },
+      "half": { "x": 2, "y": 1, "z": 0.5 }
+    },
+    {
+      "comment": "Verticality: rooftop elevated box on west building A — accessible from south via step",
+      "center": { "x": -20, "y": 8, "z": -18 },
+      "half": { "x": 8, "y": 0.5, "z": 2 }
+    },
+    {
+      "comment": "Verticality: access ramp/step up to rooftop (low step at base of west building A south face)",
+      "center": { "x": -14, "y": 0.4, "z": -19 },
+      "half": { "x": 2, "y": 0.4, "z": 1 }
+    },
+    {
+      "comment": "Left lane: dumpster / full-height block mid left lane",
+      "center": { "x": -14, "y": 1.25, "z": 0 },
+      "half": { "x": 1, "y": 1.25, "z": 2 }
+    },
+    {
+      "comment": "Right lane: dumpster / full-height block mid right lane",
+      "center": { "x": 14, "y": 1.25, "z": 0 },
+      "half": { "x": 1, "y": 1.25, "z": 2 }
+    }
+  ],
+  "spawns": [
+    {
+      "comment": "Team alpha spawn 1 — south end, mid lane, facing north",
+      "position": { "x": 0, "y": 0, "z": 37 },
+      "yaw": 3.14159,
+      "team": "alpha"
+    },
+    {
+      "comment": "Team alpha spawn 2 — south end, left lane",
+      "position": { "x": -28, "y": 0, "z": 37 },
+      "yaw": 3.14159,
+      "team": "alpha"
+    },
+    {
+      "comment": "Team alpha spawn 3 — south end, right lane",
+      "position": { "x": 28, "y": 0, "z": 37 },
+      "yaw": 3.14159,
+      "team": "alpha"
+    },
+    {
+      "comment": "Team bravo spawn 1 — north end, mid lane, facing south",
+      "position": { "x": 0, "y": 0, "z": -37 },
+      "yaw": 0,
+      "team": "bravo"
+    },
+    {
+      "comment": "Team bravo spawn 2 — north end, left lane",
+      "position": { "x": -28, "y": 0, "z": -37 },
+      "yaw": 0,
+      "team": "bravo"
+    },
+    {
+      "comment": "Team bravo spawn 3 — north end, right lane",
+      "position": { "x": 28, "y": 0, "z": -37 },
+      "yaw": 0,
+      "team": "bravo"
+    },
+    {
+      "comment": "Neutral spawn — mid-map west flank",
+      "position": { "x": -33, "y": 0, "z": 0 },
+      "yaw": 0,
+      "team": "neutral"
+    },
+    {
+      "comment": "Neutral spawn — mid-map east flank",
+      "position": { "x": 33, "y": 0, "z": 0 },
+      "yaw": 3.14159,
+      "team": "neutral"
+    }
+  ]
+}

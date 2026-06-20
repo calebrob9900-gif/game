@@ -8,6 +8,9 @@ export {
   TAC_SPRINT_MULT,
   SPRINT_OUT_TICKS,
   TAC_SPRINT_OUT_TICKS,
+  EYE_HEIGHT_STAND,
+  EYE_HEIGHT_CROUCH,
+  CROUCH_SPEED_MULT,
 } from './world';
 export type { SimWorld, Entity, SimSettings, GameEvents } from './world';
 export { snapshot } from './snapshot';
@@ -28,13 +31,16 @@ export type { Vec3 } from './core/vec';
 export type { LevelDescriptor, BoxCollider, SpawnPoint } from './levels/levelDescriptor';
 export { validateLevel } from './levels/levelDescriptor';
 export { createTestLevel } from './levels/testLevel';
+export { parseLevel } from './levels/loadLevel';
 
 // Physics / character controller
 export {
   moveAndResolve,
   integratePlayer,
   resolveCapsuleVsBox,
+  hasHeadroomToStand,
   PLAYER_CAPSULE,
+  PLAYER_CAPSULE_CROUCHED,
   STEP_HEIGHT,
   DEFAULT_MOVEMENT_PARAMS,
 } from './physics/characterController';
@@ -43,3 +49,18 @@ export type {
   ControllerState,
   PlayerMovementParams,
 } from './physics/characterController';
+
+// Weapons — data-driven weapon schema (T-110)
+export type {
+  WeaponDef,
+  WeaponClass,
+  FireMode,
+  HitType,
+  FalloffEntry,
+  DamageMult,
+  SpreadParams,
+  RecoilPatternEntry,
+  ProjectileParams,
+} from './weapons/weaponDef';
+export { fireInterval, validateWeapon } from './weapons/weaponDef';
+export { AR_BASELINE, WEAPON_REGISTRY, getWeapon, ttkBody } from './weapons/weapons';

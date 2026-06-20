@@ -30,15 +30,15 @@ export default defineConfig({
     browserName: 'chromium',
     launchOptions: { args: SOFTWARE_GL_ARGS },
   },
-  // Serve the prebuilt `--mode test` static bundle via `vite preview` (NOT the dev
-  // server): preview starts instantly with no serve-time dep optimization, which
-  // is what made the dev server flaky/timeout in the CI Playwright container.
-  // The bundle is built by `pnpm build:test` (run by the test:* scripts).
+  // Serve the prebuilt `--mode test` bundle (pnpm build:test → dist-test) with a
+  // tiny Node static server that binds EXPLICITLY to 127.0.0.1. vite dev AND vite
+  // preview both failed to bind/respond in the CI Playwright container (120s
+  // webServer timeouts); a plain static server removes all vite-server quirks.
   webServer: {
-    command: `pnpm exec vite preview --outDir dist-test --port ${PORT} --strictPort`,
+    command: `node scripts/serve-dist-test.mjs ${PORT}`,
     url: BASE_URL,
     reuseExistingServer: !process.env.CI,
-    timeout: 120_000,
+    timeout: 60_000,
     stdout: 'ignore',
     stderr: 'pipe',
   },

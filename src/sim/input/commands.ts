@@ -21,6 +21,12 @@ export interface MoveCommand {
    * Optional (defaults false). From research/03 §7.2.
    */
   readonly tacSprint?: boolean;
+  /**
+   * Crouch input. When held and on ground: speed ×0.45, lower stance (eyeHeight ~1.0,
+   * capsule height ~1.2 m). Mutually exclusive with sprint — crouch wins if both held.
+   * Optional (defaults false) so existing literals stay valid. From research/03 §7.3.
+   */
+  readonly crouch?: boolean;
 }
 
 export interface LookCommand {
@@ -42,12 +48,26 @@ export interface TickInput {
   sprint: boolean;
   /** True when the tactical-sprint key is held this tick. */
   tacSprint: boolean;
+  /**
+   * True when the crouch key is held this tick. Mutually exclusive with sprint
+   * (crouch wins). Optional source field; defaults false when absent.
+   */
+  crouch: boolean;
   dyaw: number;
   dpitch: number;
 }
 
 export function emptyTickInput(): TickInput {
-  return { forward: 0, right: 0, jump: false, sprint: false, tacSprint: false, dyaw: 0, dpitch: 0 };
+  return {
+    forward: 0,
+    right: 0,
+    jump: false,
+    sprint: false,
+    tacSprint: false,
+    crouch: false,
+    dyaw: 0,
+    dpitch: 0,
+  };
 }
 
 /** Fold a list of commands into a single tick's input. */
@@ -60,6 +80,7 @@ export function foldCommands(commands: readonly Command[]): TickInput {
       input.jump = input.jump || cmd.jump;
       input.sprint = input.sprint || (cmd.sprint ?? false);
       input.tacSprint = input.tacSprint || (cmd.tacSprint ?? false);
+      input.crouch = input.crouch || (cmd.crouch ?? false);
     } else {
       input.dyaw += cmd.dyaw;
       input.dpitch += cmd.dpitch;

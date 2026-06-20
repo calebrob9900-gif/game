@@ -42,6 +42,35 @@ export const PLAYER_CAPSULE: CapsuleShape = {
 };
 
 /**
+ * Crouched player capsule: 1.2 m tall, 0.3 m radius.
+ * halfHeight = (1.2 - 2*0.3) / 2 = 0.3
+ * Player fits under low overhangs (~1.2 m clearance).
+ * From research/03 §7.3: capsule height ~1.2 m when crouched.
+ */
+export const PLAYER_CAPSULE_CROUCHED: CapsuleShape = {
+  radius: 0.3,
+  halfHeight: 0.3, // halfHeight = (1.2 - 2*0.3) / 2 = 0.3
+};
+
+/**
+ * Eye height when standing (m). Camera/presentation layer uses this.
+ * From research/03 §7.3 and DEFAULT_SETTINGS.eyeHeight.
+ */
+export const EYE_HEIGHT_STAND = 1.7;
+
+/**
+ * Eye height when crouched (m). Camera is lowered to simulate ducking.
+ * From research/03 §7.3: camera ~1.0 m while crouched.
+ */
+export const EYE_HEIGHT_CROUCH = 1.0;
+
+/**
+ * Crouch speed multiplier. From research/03 §7.3: ×0.4–0.5.
+ * Chosen 0.45 (midpoint). Applied to maxRunSpeed.
+ */
+export const CROUCH_SPEED_MULT = 0.45;
+
+/**
  * Maximum ledge height the controller can automatically step over (m).
  * From research/03 §7.3: mantle/vault maxHeight ~1.0–1.3 m; step is smaller.
  */
@@ -309,6 +338,18 @@ export interface PlayerMovementParams {
    * LMG/sniper 0.75. Absent ⇒ treated as 1.0 (so existing golden hashes hold).
    */
   moveMult?: number;
+  /**
+   * Whether the player is pressing the crouch key this tick.
+   * Omit or false for no crouch (default unchanged behaviour).
+   * From research/03 §7.3.
+   */
+  crouchInput?: boolean;
+  /**
+   * Whether the player was crouched on the previous tick.
+   * Needed to maintain crouch state and detect stand-up attempts.
+   * Omit or false for standing (default).
+   */
+  wasCrouched?: boolean;
 }
 
 export const DEFAULT_MOVEMENT_PARAMS: PlayerMovementParams = {
@@ -318,14 +359,42 @@ export const DEFAULT_MOVEMENT_PARAMS: PlayerMovementParams = {
   gravity: 20,
   jumpSpeed: 6.3,
   moveMult: 1.0,
+  crouchInput: false,
+  wasCrouched: false,
 };
+
+/**
+ * Check whether the player can stand up (uncrouch) at the given foot position.
+ *
+ * Tests if the standing capsule (PLAYER_CAPSULE) would overlap any collider.
+ * Returns true if there is sufficient headroom, false if blocked above.
+ */
+export function hasHeadroomToStand(
+  footX: number,
+  footY: number,
+  footZ: number,
+  colliders: readonly BoxCollider[],
+): boolean {
+  for (const box of colliders) {
+    const hit = resolveCapsuleVsBox(footX, footY, footZ, PLAYER_CAPSULE, box);
+    if (hit && hit.depth > 0) return false;
+  }
+  return true;
+}
 
 /**
  * Integrate player movement for one fixed tick (dt).
  *
- * Applies friction, acceleration, gravity, jump, then calls moveAndResolve.
+ * Applies friction, acceleration, gravity, jump, crouch, then calls moveAndResolve.
  * Frame-rate-independent: friction uses `1 - exp(-lambda*dt)`, accel is
  * clamped by `min(1, accel*dt)`.
+ *
+ * Crouch logic (research/03 §7.3):
+ *   - When crouchInput=true AND onGround: player is crouched this tick.
+ *   - Crouch wins over sprint (sprint is disabled when crouching).
+ *   - Speed is multiplied by CROUCH_SPEED_MULT (0.45) on top of moveMult.
+ *   - The crouched capsule (PLAYER_CAPSULE_CROUCHED) is used for collision.
+ *   - When uncouching: check headroom; if blocked above, stay crouched.
  *
  * @param state     Mutable controller state (position, velocity, onGround)
  * @param wishX     Desired movement direction X (world space, normalized)
@@ -334,7 +403,8 @@ export const DEFAULT_MOVEMENT_PARAMS: PlayerMovementParams = {
  * @param colliders Level box colliders
  * @param params    Movement tuning params
  * @param dt        Fixed timestep (seconds)
- * @param capsule   Capsule shape (default PLAYER_CAPSULE)
+ * @param capsule   Capsule shape override (default auto-selected by crouch state)
+ * @returns         Whether the player is crouched after this tick
  */
 export function integratePlayer(
   state: ControllerState,
@@ -344,9 +414,37 @@ export function integratePlayer(
   colliders: readonly BoxCollider[],
   params: PlayerMovementParams,
   dt: number,
-  capsule: CapsuleShape = PLAYER_CAPSULE,
-): void {
+  capsule?: CapsuleShape,
+): boolean {
   const vel = state.velocity;
+  const crouchInput = params.crouchInput ?? false;
+  const wasCrouched = params.wasCrouched ?? false;
+
+  // --- Determine crouch state for this tick ---
+  // Crouch is active when: crouchInput held AND onGround.
+  // When crouchInput is released: attempt to stand; stay crouched if blocked above.
+  let isCrouched: boolean;
+  if (crouchInput && state.onGround) {
+    // Want to crouch and on ground → crouch.
+    isCrouched = true;
+  } else if (wasCrouched && !crouchInput) {
+    // Was crouched, wants to stand → check headroom.
+    // Use foot position from state.position (already foot coords in capsule path).
+    isCrouched = !hasHeadroomToStand(
+      state.position.x,
+      state.position.y,
+      state.position.z,
+      colliders,
+    );
+  } else if (wasCrouched && crouchInput) {
+    // Still holding crouch while in air → stay crouched.
+    isCrouched = true;
+  } else {
+    isCrouched = false;
+  }
+
+  // Select effective capsule based on crouch state (or use override if provided).
+  const effectiveCapsule = capsule ?? (isCrouched ? PLAYER_CAPSULE_CROUCHED : PLAYER_CAPSULE);
 
   // --- Friction (horizontal) — frame-rate-independent exponential decay ---
   // Applied EVERY grounded tick, independent of wish input. While a key is held,
@@ -365,9 +463,12 @@ export function integratePlayer(
 
   // --- Ground acceleration toward wish velocity ---
   if (wishX !== 0 || wishZ !== 0) {
-    // Per-weapon move multiplier scales the effective top speed (research/03 §7.1, §8.2).
-    // moveMult defaults to 1.0 so existing behaviour is unchanged when not specified.
-    const effectiveMaxSpeed = params.maxRunSpeed * (params.moveMult ?? 1.0);
+    // Compose multipliers: per-weapon moveMult × crouch multiplier.
+    // Crouch wins over sprint (sprint multiplier is ignored when crouching — handled
+    // in world.ts by zeroing sprintMult when isCrouched). The moveMult passed here
+    // already has sprint folded in from world.ts when not crouching.
+    const crouchFactor = isCrouched ? CROUCH_SPEED_MULT : 1.0;
+    const effectiveMaxSpeed = params.maxRunSpeed * (params.moveMult ?? 1.0) * crouchFactor;
     const targetX = wishX * effectiveMaxSpeed;
     const targetZ = wishZ * effectiveMaxSpeed;
     // Clamp accel to at most 1 (can't overshoot in one tick)
@@ -376,10 +477,14 @@ export function integratePlayer(
     vel.z += (targetZ - vel.z) * accelFactor;
   }
 
-  // --- Jump ---
+  // --- Jump (only allowed when standing, not while crouched — per CoD/Valorant model) ---
+  // NOTE: jump IS allowed while crouched per research/03 §7.3 (no explicit block).
+  // CoD allows jumping while crouched. We allow it here.
   if (jump && state.onGround) {
     vel.y = params.jumpSpeed;
     state.onGround = false;
+    // When jumping from crouch, uncrouch in air.
+    isCrouched = false;
   }
 
   // --- Gravity ---
@@ -393,5 +498,7 @@ export function integratePlayer(
   };
 
   // --- Move and resolve collisions ---
-  moveAndResolve(state, delta, colliders, capsule, STEP_HEIGHT);
+  moveAndResolve(state, delta, colliders, effectiveCapsule, STEP_HEIGHT);
+
+  return isCrouched;
 }

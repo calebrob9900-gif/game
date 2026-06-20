@@ -7,10 +7,15 @@ import { foldCommands, type Command } from './input/commands';
 import type { LevelDescriptor } from './levels/levelDescriptor';
 import {
   integratePlayer,
-  PLAYER_CAPSULE,
+  EYE_HEIGHT_STAND,
+  EYE_HEIGHT_CROUCH,
+  CROUCH_SPEED_MULT,
   type ControllerState,
   type PlayerMovementParams,
 } from './physics/characterController';
+
+// ── Re-export crouch constants so tests can import them from sim ───────────────
+export { EYE_HEIGHT_STAND, EYE_HEIGHT_CROUCH, CROUCH_SPEED_MULT };
 
 // ── Sprint constants (research/03 §7.2, §2.2) ─────────────────────────────────
 
@@ -73,6 +78,13 @@ export interface Entity {
    * Absent or 0 ⇒ no sprint-out window active.
    */
   sprintOutUntilTick?: number;
+  /**
+   * Whether the player is currently crouched.
+   * True when crouch input is held AND on ground (or blocked from standing).
+   * Absent ⇒ not crouched (default). Only set once crouch input is received.
+   * From research/03 §7.3.
+   */
+  isCrouched?: boolean;
 }
 
 export interface SimSettings {
@@ -190,14 +202,21 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
     wishZ /= wishLen;
   }
 
+  // --- Crouch input (research/03 §7.3) ---
+  // Crouch is determined BEFORE sprint so we can enforce "crouch wins over sprint".
+  const crouchInput = input.crouch;
+  const wasCrouched = p.isCrouched ?? false;
+
   // --- Sprint state (research/03 §7.2) ---
   // Sprint requires forward-ish movement: the forward component of the input must
   // exceed SPRINT_FORWARD_MIN. We check input.forward directly (not the wish vector,
   // which is rotated by yaw) — sprint is "I pressed W fast", not a world-space query.
+  // Crouch wins over sprint: if crouch is held, sprint is suppressed entirely.
   const hasForwardInput = input.forward >= SPRINT_FORWARD_MIN;
-  // Tac-sprint supersedes sprint when both are pressed.
-  const activeTacSprint = (input.tacSprint ?? false) && hasForwardInput;
-  const activeSprint = !activeTacSprint && (input.sprint ?? false) && hasForwardInput;
+  // Tac-sprint supersedes sprint when both are pressed. Both suppressed by crouch.
+  const activeTacSprint = !crouchInput && (input.tacSprint ?? false) && hasForwardInput;
+  const activeSprint =
+    !crouchInput && !activeTacSprint && (input.sprint ?? false) && hasForwardInput;
   const isSprintingNow = activeSprint || activeTacSprint;
 
   // Only update sprint state on the entity when sprint is or was relevant.
@@ -229,14 +248,16 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
 
   // Compose sprint multiplier with per-weapon moveMult.
   // Sprint multipliers: ×1.4 (sprint), ×1.7 (tac-sprint). Applied on top of moveMult.
+  // Crouch multiplier is applied inside integratePlayer, NOT here, to avoid double-applying.
   const sprintMult = activeTacSprint ? TAC_SPRINT_MULT : activeSprint ? SPRINT_MULT : 1.0;
   const combinedMoveMult = (p.moveMult ?? 1.0) * sprintMult;
 
   if (world.level) {
     // ── Capsule controller path ──────────────────────────────────────────────
     // Player position stores the EYE position. We convert to foot position for
-    // the physics controller (foot = eye - eyeHeight), integrate, then convert back.
-    const footY = p.position.y - s.eyeHeight;
+    // the physics controller (foot = eye - eyeHeight). Eye height depends on crouch state.
+    const currentEyeHeight = wasCrouched ? EYE_HEIGHT_CROUCH : EYE_HEIGHT_STAND;
+    const footY = p.position.y - currentEyeHeight;
     const ctrlState: ControllerState = {
       position: { x: p.position.x, y: footY, z: p.position.z },
       velocity: { x: p.velocity.x, y: p.velocity.y, z: p.velocity.z },
@@ -252,6 +273,10 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
       // Combined sprint × per-weapon move multiplier. When not sprinting, this is
       // just p.moveMult (or 1.0), preserving existing golden hashes for non-sprint input.
       moveMult: combinedMoveMult,
+      // Crouch params — only passed when crouch has been activated.
+      // Omitting when false preserves default behaviour.
+      crouchInput,
+      wasCrouched,
     };
 
     // Fire jump event BEFORE integration (so listener sees the world state)
@@ -259,7 +284,7 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
       world.events.emit('jump', { tick: world.tick });
     }
 
-    integratePlayer(
+    const nowCrouched = integratePlayer(
       ctrlState,
       wishX,
       wishZ,
@@ -267,20 +292,32 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
       world.level.colliders,
       movParams,
       DT,
-      PLAYER_CAPSULE,
     );
 
-    // Write back to entity (eye = foot + eyeHeight)
+    // Write back to entity.
+    // Eye height is now determined by the post-integration crouch state.
+    const newEyeHeight = nowCrouched ? EYE_HEIGHT_CROUCH : EYE_HEIGHT_STAND;
     p.position.x = ctrlState.position.x;
-    p.position.y = ctrlState.position.y + s.eyeHeight;
+    p.position.y = ctrlState.position.y + newEyeHeight;
     p.position.z = ctrlState.position.z;
     p.velocity.x = ctrlState.velocity.x;
     p.velocity.y = ctrlState.velocity.y;
     p.velocity.z = ctrlState.velocity.z;
     p.onGround = ctrlState.onGround;
+
+    // Only store isCrouched on entity when crouch has been used (to preserve
+    // existing golden hashes for scenarios without any crouch input — hash only
+    // folds isCrouched when the field is defined, matching the sprint pattern).
+    if (crouchInput || wasCrouched) {
+      p.isCrouched = nowCrouched;
+    }
   } else {
     // ── Flat-ground fallback path (no level loaded) ──────────────────────────
     const vel = p.velocity;
+
+    // Flat-ground path: minimal crouch support (lowers eyeHeight for the ground plane).
+    // Headroom check is not meaningful without colliders.
+    const isCrouchedFlat = crouchInput && (p.onGround ?? true);
 
     // Friction (horizontal)
     const speed = lengthHoriz(vel);
@@ -292,9 +329,10 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
       vel.z *= scale;
     }
 
-    // Acceleration toward wish velocity (apply combined sprint × weapon moveMult)
-    const targetX = wishX * s.moveSpeed * combinedMoveMult;
-    const targetZ = wishZ * s.moveSpeed * combinedMoveMult;
+    // Acceleration toward wish velocity (apply combined sprint × weapon moveMult × crouch)
+    const crouchFactor = isCrouchedFlat ? CROUCH_SPEED_MULT : 1.0;
+    const targetX = wishX * s.moveSpeed * combinedMoveMult * crouchFactor;
+    const targetZ = wishZ * s.moveSpeed * combinedMoveMult * crouchFactor;
     vel.x += (targetX - vel.x) * Math.min(1, s.accel * DT * 0.25);
     vel.z += (targetZ - vel.z) * Math.min(1, s.accel * DT * 0.25);
 
@@ -312,11 +350,19 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
     p.position.y += vel.y * DT;
     p.position.z += vel.z * DT;
 
-    // Ground collision (flat plane at eyeHeight)
-    if (p.position.y <= s.eyeHeight) {
-      p.position.y = s.eyeHeight;
+    // Eye height depends on crouch (crouching lowers it)
+    const flatEyeHeight = isCrouchedFlat ? EYE_HEIGHT_CROUCH : s.eyeHeight;
+
+    // Ground collision (flat plane at eyeHeight for standing, lower for crouch)
+    if (p.position.y <= flatEyeHeight) {
+      p.position.y = flatEyeHeight;
       if (vel.y < 0) vel.y = 0;
       p.onGround = true;
+    }
+
+    // Store isCrouched only when crouch has been used (same pattern as capsule path)
+    if (crouchInput || wasCrouched) {
+      p.isCrouched = isCrouchedFlat;
     }
   }
 
