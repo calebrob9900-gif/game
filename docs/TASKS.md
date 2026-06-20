@@ -37,7 +37,7 @@
 
 ## PHASE 1 — Core first-person feel (movement + gunplay)
 
-- [ ] T-101 Physics/controller spike: Rapier `KinematicCharacterController` vs three-mesh-bvh; pick + document. — acceptance: capsule moves deterministically vs a test level. [V2]
+- [x] T-101 Physics/controller spike: Rapier `KinematicCharacterController` vs three-mesh-bvh; pick + document. — acceptance: capsule moves deterministically vs a test level. [V2] — ccd7399 (ADR 0001: pure-TS capsule-vs-AABB chosen; three-mesh-bvh disqualified by sim import-boundary, Rapier deferred to presentation. capsulePhysics.test.ts golden 2be1af91. reviewer APPROVED)
 - [ ] T-102 Ground movement: accel + friction (counter-strafe), per-weapon move mult. — acceptance: replay reproduces position curve; params per `research/03`. [V2]
 - [ ] T-103 Sprint + **tactical sprint** + sprint-to-fire delay. — acceptance: E2E: fire blocked during sprint-out window. [V3]
 - [ ] T-104 Crouch + jump (gravity ~18–25 m/s²). — acceptance: replay-stable heights. [V2]
@@ -173,5 +173,5 @@
 ---
 
 ## Progress
-- P0: 18/19 (T-005 awaiting CI-green confirmation) · P1: 0/22 · P2: 0/10 · P3: 0/14 · P4: 0/5 · P5: 0/7 · P6: 0/16 · P7: 0/8 · P8: 0/8 (deferred)
+- P0: 18/19 (T-005 awaiting CI-green confirmation) · P1: 1/22 (T-101) · P2: 0/10 · P3: 0/14 · P4: 0/5 · P5: 0/7 · P6: 0/16 · P7: 0/8 · P8: 0/8 (deferred)
 - Update counts as boxes flip. v1 is done when **P0–P7 are fully `[x]`** and the v1 ship gate passes (`GOAL.md`).
