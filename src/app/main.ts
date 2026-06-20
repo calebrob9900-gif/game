@@ -6,6 +6,11 @@ import { RenderSync } from '../presentation/view/renderSync';
 import { Hud, injectHudStyles } from '../presentation/ui/hud';
 import { PointerLook } from '../presentation/input-capture/pointerLook';
 import { AudioManager } from '../presentation/audio/audioManager';
+import {
+  Hitmarker,
+  injectHitmarkerStyles,
+  type HitmarkerVariant,
+} from '../presentation/ui/hitmarker';
 import { FixedLoop } from './loop';
 import { FrameProbe } from './perf';
 import { installInstrumentation } from './instrumentation';
@@ -34,6 +39,45 @@ async function main(): Promise<void> {
         ? createMantleTestLevel()
         : null;
   const world: SimWorld = createWorld(seed, undefined, level);
+
+  // T-120: hitmarker_test scenario — three target bots at known positions so the
+  // E2E test can fire with precise aim and verify all hitmarker variants.
+  //
+  // All bots placed 3 m in front (z=-3) but at different x offsets so they can
+  // be targeted individually by rotating yaw. Player default: eye at (0,1.7,0).
+  //
+  //   Bot A x=0,  z=-3, health=100: chest hit (no head, not lethal) → 'normal'
+  //   Bot B x=3,  z=-3, health=100: head hit (not lethal)            → 'head'
+  //   Bot C x=-3, z=-3, health=25:  body hit (lethal: 25*1.0=25 dmg) → 'kill'
+  //
+  // Aim angles (from player eye at (0,1.7,0), yaw measured from -Z axis):
+  //   Bot A: yaw=0 (straight), pitch=atan2(1.7-1.4, 3)≈0.0997 rad (chest center)
+  //   Bot B: yaw=π/4≈0.785 rad (right), pitch≈-0.00589 rad (head center up)
+  //   Bot C: yaw=-π/4≈-0.785 rad (left), pitch≈atan2(1.7-0.925, 4.243)≈0.181 rad
+  if (scenario === 'hitmarker_test') {
+    // Bot A — body hit (chest, non-lethal, health=100)
+    world.ecs.add({
+      position: { x: 0, y: 1.7, z: -3 },
+      velocity: { x: 0, y: 0, z: 0 },
+      health: 100,
+      damageable: true,
+    });
+    // Bot B — headshot (non-lethal, health=100)
+    world.ecs.add({
+      position: { x: 3, y: 1.7, z: -3 },
+      velocity: { x: 0, y: 0, z: 0 },
+      health: 100,
+      damageable: true,
+    });
+    // Bot C — kill shot (lethal: stomach hit=25*1.0=25, exactly kills health=25)
+    world.ecs.add({
+      position: { x: -3, y: 1.7, z: -3 },
+      velocity: { x: 0, y: 0, z: 0 },
+      health: 25,
+      damageable: true,
+    });
+  }
+
   const commands = new CommandBuffer();
   const renderSync = new RenderSync();
   const probe = new FrameProbe();
@@ -46,6 +90,28 @@ async function main(): Promise<void> {
   // Audio system — subscribes to sim events, updates listener from camera each frame.
   // Instantiated before the loop starts so event subscriptions are active from tick 0.
   const audioManager = new AudioManager(world.events);
+  // Hitmarker overlay — DOM outside #game canvas (T-120).
+  injectHitmarkerStyles();
+  const hitmarker = new Hitmarker(document.body);
+
+  // Subscribe to sim 'hit' events; determine variant and show hitmarker.
+  // kill > head > normal: if the hit is lethal, always use kill variant.
+  world.events.on('hit', (evt) => {
+    let variant: HitmarkerVariant;
+    if (evt.lethal) {
+      variant = 'kill';
+    } else if (evt.region === 'head') {
+      variant = 'head';
+    } else {
+      variant = 'normal';
+    }
+    hitmarker.show(variant);
+    // T-120: expose for test instrumentation (stripped from production builds
+    // via the same DEV / test guard used by installInstrumentation).
+    if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+      window.__lastHitmarker = variant;
+    }
+  });
 
   renderSync.push(snapshot(world));
 
