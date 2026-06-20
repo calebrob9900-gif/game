@@ -24,6 +24,12 @@ export interface Entity {
   pitch?: number;
   onGround?: boolean;
   health?: number;
+  /**
+   * Per-weapon move speed multiplier. Applied in integratePlayer to scale maxRunSpeed.
+   * From research/03 §7.1: knife/empty 1.0, AR 0.85, LMG/sniper 0.75.
+   * Defaults to 1.0 (no penalty) when absent so existing golden hashes are unchanged.
+   */
+  moveMult?: number;
 }
 
 export interface SimSettings {
@@ -158,6 +164,9 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
       friction: s.friction,
       gravity: s.gravity,
       jumpSpeed: s.jumpSpeed,
+      // Per-weapon move mult from entity (default 1.0 = no penalty).
+      // Set p.moveMult before calling step() to apply a weapon-based speed penalty.
+      moveMult: p.moveMult ?? 1.0,
     };
 
     // Fire jump event BEFORE integration (so listener sees the world state)

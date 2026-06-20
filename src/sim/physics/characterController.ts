@@ -303,6 +303,13 @@ export interface PlayerMovementParams {
   gravity: number;
   /** Jump launch speed (m/s). Tuned for ~1 m apex with gravity 20: sqrt(2*20*1)≈6.3. */
   jumpSpeed: number;
+  /**
+   * Per-weapon move speed multiplier (scales maxRunSpeed).
+   * From research/03 §7.1 / §8.2:
+   *   knife/empty = 1.0, AR = 0.85, LMG/sniper = 0.75.
+   * Default 1.0 — must stay 1.0 so existing golden hashes are unaffected.
+   */
+  moveMult: number;
 }
 
 export const DEFAULT_MOVEMENT_PARAMS: PlayerMovementParams = {
@@ -311,6 +318,7 @@ export const DEFAULT_MOVEMENT_PARAMS: PlayerMovementParams = {
   friction: 8,
   gravity: 20,
   jumpSpeed: 6.3,
+  moveMult: 1.0,
 };
 
 /**
@@ -355,8 +363,11 @@ export function integratePlayer(
 
   // --- Ground acceleration toward wish velocity ---
   if (wishX !== 0 || wishZ !== 0) {
-    const targetX = wishX * params.maxRunSpeed;
-    const targetZ = wishZ * params.maxRunSpeed;
+    // Per-weapon move multiplier scales the effective top speed (research/03 §7.1, §8.2).
+    // moveMult defaults to 1.0 so existing behaviour is unchanged when not specified.
+    const effectiveMaxSpeed = params.maxRunSpeed * (params.moveMult ?? 1.0);
+    const targetX = wishX * effectiveMaxSpeed;
+    const targetZ = wishZ * effectiveMaxSpeed;
     // Clamp accel to at most 1 (can't overshoot in one tick)
     const accelFactor = Math.min(1, params.groundAccel * dt);
     vel.x += (targetX - vel.x) * accelFactor;
