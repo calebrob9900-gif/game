@@ -10,6 +10,17 @@ export interface MoveCommand {
   /** -1..1 desired ground move on the strafe axis. */
   readonly right: number;
   readonly jump: boolean;
+  /**
+   * Sprint input. Requires forward-ish movement. Grants ×1.4 of base run speed.
+   * Forbids firing while active. Optional (defaults false) so existing literals stay valid.
+   * From research/03 §7.2.
+   */
+  readonly sprint?: boolean;
+  /**
+   * Tactical sprint input. Grants ×1.7 of base run speed with a longer sprint-out window.
+   * Optional (defaults false). From research/03 §7.2.
+   */
+  readonly tacSprint?: boolean;
 }
 
 export interface LookCommand {
@@ -27,12 +38,16 @@ export interface TickInput {
   forward: number;
   right: number;
   jump: boolean;
+  /** True when the sprint key is held this tick. */
+  sprint: boolean;
+  /** True when the tactical-sprint key is held this tick. */
+  tacSprint: boolean;
   dyaw: number;
   dpitch: number;
 }
 
 export function emptyTickInput(): TickInput {
-  return { forward: 0, right: 0, jump: false, dyaw: 0, dpitch: 0 };
+  return { forward: 0, right: 0, jump: false, sprint: false, tacSprint: false, dyaw: 0, dpitch: 0 };
 }
 
 /** Fold a list of commands into a single tick's input. */
@@ -43,6 +58,8 @@ export function foldCommands(commands: readonly Command[]): TickInput {
       input.forward = clamp(cmd.forward, -1, 1);
       input.right = clamp(cmd.right, -1, 1);
       input.jump = input.jump || cmd.jump;
+      input.sprint = input.sprint || (cmd.sprint ?? false);
+      input.tacSprint = input.tacSprint || (cmd.tacSprint ?? false);
     } else {
       input.dyaw += cmd.dyaw;
       input.dpitch += cmd.dpitch;

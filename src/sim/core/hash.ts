@@ -54,6 +54,12 @@ function foldEntity(h: number, e: Entity): number {
   if (e.pitch !== undefined) h = foldNumber(h, e.pitch);
   if (e.onGround !== undefined) h = foldStr(h, e.onGround ? 'g' : 'a');
   if (e.health !== undefined) h = foldNumber(h, e.health);
+  // Sprint state — only hashed when present so default (absent) behaviour is unchanged,
+  // preserving all existing golden hashes from T-101/T-102.
+  if (e.isSprinting !== undefined) h = foldStr(h, e.isSprinting ? 'S' : 's');
+  if (e.wasTacSprinting !== undefined) h = foldStr(h, e.wasTacSprinting ? 'T' : 't');
+  if (e.sprintOutUntilTick !== undefined && e.sprintOutUntilTick > 0)
+    h = foldNumber(h, e.sprintOutUntilTick);
   return h;
 }
 

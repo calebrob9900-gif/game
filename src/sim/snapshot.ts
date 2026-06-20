@@ -13,6 +13,22 @@ export interface PlayerSnapshot {
   pitch: number;
   onGround: boolean;
   health: number;
+  /**
+   * Whether the player is currently sprinting or tac-sprinting.
+   * Added for T-103. False when not sprinting.
+   */
+  isSprinting: boolean;
+  /**
+   * Tick at which the sprint-out window expires (exclusive).
+   * Zero means no window is active.
+   */
+  sprintOutUntilTick: number;
+  /**
+   * Derived gate: false while sprinting AND during the sprint-out window; true otherwise.
+   * Future weapon fire systems (T-111) read this to block firing.
+   * Equals: !(isSprinting || world.tick < sprintOutUntilTick)
+   */
+  canFire: boolean;
 }
 
 export interface Snapshot {
@@ -22,6 +38,10 @@ export interface Snapshot {
 
 export function snapshot(world: SimWorld): Snapshot {
   const p = getPlayer(world);
+  const isSprinting = p.isSprinting ?? false;
+  const sprintOutUntilTick = p.sprintOutUntilTick ?? 0;
+  // canFire is false while sprinting OR while the sprint-out window is active.
+  const canFire = !isSprinting && world.tick >= sprintOutUntilTick;
   return {
     tick: world.tick,
     player: {
@@ -31,6 +51,9 @@ export function snapshot(world: SimWorld): Snapshot {
       pitch: p.pitch ?? 0,
       onGround: p.onGround ?? false,
       health: p.health ?? 0,
+      isSprinting,
+      sprintOutUntilTick,
+      canFire,
     },
   };
 }

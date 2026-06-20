@@ -1,5 +1,14 @@
 /** Public surface of the deterministic simulation (headless, no three/DOM). */
-export { createWorld, step, getPlayer, DEFAULT_SETTINGS } from './world';
+export {
+  createWorld,
+  step,
+  getPlayer,
+  DEFAULT_SETTINGS,
+  SPRINT_MULT,
+  TAC_SPRINT_MULT,
+  SPRINT_OUT_TICKS,
+  TAC_SPRINT_OUT_TICKS,
+} from './world';
 export type { SimWorld, Entity, SimSettings, GameEvents } from './world';
 export { snapshot } from './snapshot';
 export type { Snapshot, PlayerSnapshot } from './snapshot';

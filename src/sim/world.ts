@@ -1,7 +1,7 @@
 import { World } from './core/ecs';
 import { EventBus } from './core/events';
 import { createRng, type RngState } from './core/rng';
-import { DT } from './core/time';
+import { DT, TICK_RATE } from './core/time';
 import { vec3, lengthHoriz, type Vec3 } from './core/vec';
 import { foldCommands, type Command } from './input/commands';
 import type { LevelDescriptor } from './levels/levelDescriptor';
@@ -11,6 +11,28 @@ import {
   type ControllerState,
   type PlayerMovementParams,
 } from './physics/characterController';
+
+// ── Sprint constants (research/03 §7.2, §2.2) ─────────────────────────────────
+
+/** Sprint speed multiplier: ×1.4 of base run speed. */
+export const SPRINT_MULT = 1.4;
+/** Tactical sprint speed multiplier: ×1.7 of base run speed. */
+export const TAC_SPRINT_MULT = 1.7;
+/**
+ * Sprint-out window after sprint ends: ~0.15 s → 9 ticks at 60 Hz.
+ * Firing is blocked during this window.
+ */
+export const SPRINT_OUT_TICKS = Math.round(0.15 * TICK_RATE); // 9
+/**
+ * Tac-sprint-out window after tac-sprint ends: ~0.25 s → 15 ticks at 60 Hz.
+ */
+export const TAC_SPRINT_OUT_TICKS = Math.round(0.25 * TICK_RATE); // 15
+/**
+ * Minimum forward component to allow sprint (dot product of wish direction with
+ * forward axis, in normalized wish space). Requires "forward-ish" movement.
+ * A value of 0.5 means the input direction must be within 60° of pure forward.
+ */
+const SPRINT_FORWARD_MIN = 0.5;
 
 /**
  * The simulation world. Plain-object entities (miniplex), a seeded RNG, a fixed
@@ -30,6 +52,27 @@ export interface Entity {
    * Defaults to 1.0 (no penalty) when absent so existing golden hashes are unchanged.
    */
   moveMult?: number;
+  /**
+   * Whether the player is currently sprinting or tac-sprinting this tick.
+   * Firing is forbidden while true. Set and cleared each tick by world.step().
+   * Absent ⇒ not sprinting (default unchanged behaviour).
+   */
+  isSprinting?: boolean;
+  /**
+   * True when the player was tac-sprinting on the last active sprint tick.
+   * Used to select the correct sprint-out window length on sprint release.
+   * Absent ⇒ not tac-sprinting.
+   */
+  wasTacSprinting?: boolean;
+  /**
+   * Tick number at which the sprint-out window expires (exclusive).
+   * Firing is forbidden while world.tick < sprintOutUntilTick.
+   * Sprint-out durations (research/03 §7.2, §2.2):
+   *   sprint:     ~0.15 s → 9 ticks at 60 Hz
+   *   tac-sprint: ~0.25 s → 15 ticks at 60 Hz
+   * Absent or 0 ⇒ no sprint-out window active.
+   */
+  sprintOutUntilTick?: number;
 }
 
 export interface SimSettings {
@@ -147,6 +190,48 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
     wishZ /= wishLen;
   }
 
+  // --- Sprint state (research/03 §7.2) ---
+  // Sprint requires forward-ish movement: the forward component of the input must
+  // exceed SPRINT_FORWARD_MIN. We check input.forward directly (not the wish vector,
+  // which is rotated by yaw) — sprint is "I pressed W fast", not a world-space query.
+  const hasForwardInput = input.forward >= SPRINT_FORWARD_MIN;
+  // Tac-sprint supersedes sprint when both are pressed.
+  const activeTacSprint = (input.tacSprint ?? false) && hasForwardInput;
+  const activeSprint = !activeTacSprint && (input.sprint ?? false) && hasForwardInput;
+  const isSprintingNow = activeSprint || activeTacSprint;
+
+  // Only update sprint state on the entity when sprint is or was relevant.
+  // This keeps p.isSprinting === undefined for entities that have NEVER had sprint
+  // input, preserving all existing golden hashes (hash only folds isSprinting when
+  // the field is defined — see core/hash.ts).
+  const wasSprintingBefore = p.isSprinting ?? false;
+  if (isSprintingNow || wasSprintingBefore || (p.sprintOutUntilTick ?? 0) > 0) {
+    // Sprint-out timer: set when sprint transitions active → inactive.
+    if (wasSprintingBefore && !isSprintingNow) {
+      // Determine sprint-out window length using wasTacSprinting flag, which recorded
+      // whether the previous active sprint tick was a tac-sprint.
+      const wasTac = p.wasTacSprinting ?? false;
+      const outTicks = wasTac ? TAC_SPRINT_OUT_TICKS : SPRINT_OUT_TICKS;
+      // world.tick has NOT yet incremented (it increments at the end of step()).
+      // The window expires at tick (world.tick + 1 + outTicks), exclusive.
+      const newWindow = world.tick + 1 + outTicks;
+      // Only extend (never shorten) an existing active window.
+      const existing = p.sprintOutUntilTick ?? 0;
+      p.sprintOutUntilTick = Math.max(existing, newWindow);
+    }
+    // Track which sprint mode was active (for sprint-out window selection).
+    if (isSprintingNow) {
+      p.wasTacSprinting = activeTacSprint;
+    }
+    // Write current sprint flag only when we're in the sprint branch.
+    p.isSprinting = isSprintingNow;
+  }
+
+  // Compose sprint multiplier with per-weapon moveMult.
+  // Sprint multipliers: ×1.4 (sprint), ×1.7 (tac-sprint). Applied on top of moveMult.
+  const sprintMult = activeTacSprint ? TAC_SPRINT_MULT : activeSprint ? SPRINT_MULT : 1.0;
+  const combinedMoveMult = (p.moveMult ?? 1.0) * sprintMult;
+
   if (world.level) {
     // ── Capsule controller path ──────────────────────────────────────────────
     // Player position stores the EYE position. We convert to foot position for
@@ -164,9 +249,9 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
       friction: s.friction,
       gravity: s.gravity,
       jumpSpeed: s.jumpSpeed,
-      // Per-weapon move mult from entity (default 1.0 = no penalty).
-      // Set p.moveMult before calling step() to apply a weapon-based speed penalty.
-      moveMult: p.moveMult ?? 1.0,
+      // Combined sprint × per-weapon move multiplier. When not sprinting, this is
+      // just p.moveMult (or 1.0), preserving existing golden hashes for non-sprint input.
+      moveMult: combinedMoveMult,
     };
 
     // Fire jump event BEFORE integration (so listener sees the world state)
@@ -207,9 +292,9 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
       vel.z *= scale;
     }
 
-    // Acceleration toward wish velocity
-    const targetX = wishX * s.moveSpeed;
-    const targetZ = wishZ * s.moveSpeed;
+    // Acceleration toward wish velocity (apply combined sprint × weapon moveMult)
+    const targetX = wishX * s.moveSpeed * combinedMoveMult;
+    const targetZ = wishZ * s.moveSpeed * combinedMoveMult;
     vel.x += (targetX - vel.x) * Math.min(1, s.accel * DT * 0.25);
     vel.z += (targetZ - vel.z) * Math.min(1, s.accel * DT * 0.25);
 
