@@ -33,24 +33,23 @@ each >= 4.0. After each task report: which task, verify.sh exit code, and tasks 
 
 When all three hold and are visible in the transcript, the goal auto-clears.
 
-## Hands-off mode (recommended — "start it and let it run")
-Because a single `/goal` releases after a chunk (~8-block safety override, `WORKFLOW.md §5`), the
-way to drive it to the **final product from one action** is to wrap it in `/loop`, which
-re-invokes it on an interval until everything is done:
+## How to run it (recommended: run once, re-paste when it pauses)
+A single `/goal` already works **many turns back-to-back on its own** (it's a Stop hook — it keeps
+building task after task until a safety valve trips after ~8 consecutive turns). So:
+- **Paste the `/goal` once.** Let it churn through a batch of tasks (build → verify → review →
+  commit → check box).
+- **When it pauses, glance at progress** (checkboxes in `docs/TASKS.md`) and **paste the same
+  `/goal` again.** It resumes from the first unchecked task because all progress is committed.
+- **Fresh session is fine** — the `SessionStart` hook reinstalls deps; just paste the goal again.
 
+### Optional: unattended (only if you'll be away)
+Wrap it in `/loop` with a **long** interval so runs don't overlap (a single task + verify can take
+a while — don't use short intervals):
 ```
-/loop 30m /goal Build NEON BREACH to a finished v1 ... (the full prompt above)
+/loop 60m /goal <the full prompt above>
 ```
-
-Each loop tick resumes from the first unchecked task (progress is committed), so it keeps building
-across the auto-releases until the completion condition holds, then stops. This is the intended
-"next session, start the goal, get the final product" workflow.
-
-## How to run it well
-- **Or re-run manually on release.** If you don't use `/loop`, just paste the same `/goal` again
-  whenever it stops — it resumes from the first unchecked task because all progress is committed.
-- **Fresh session is fine.** Start a new session, (optionally) confirm no stale goal is active,
-  then run the command above. The `SessionStart` hook reinstalls deps automatically.
+Each tick resumes from the first unchecked task and stops once the completion condition holds.
+**You don't need `/loop`** — running the goal once and re-pasting is the simpler, safer default.
 - **Watch a PR (optional).** If a PR is opened, you can subscribe to its CI and let failures
   auto-fix.
 - **Trust the gate, not vibes.** Progress = checkboxes flipped + `verify.sh` green in the
