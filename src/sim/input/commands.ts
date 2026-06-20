@@ -37,7 +37,16 @@ export interface LookCommand {
   readonly dpitch: number;
 }
 
-export type Command = MoveCommand | LookCommand;
+/**
+ * Fire command — trigger the player's current weapon (hitscan or projectile).
+ * Processed in world.step() inside the "// --- combat/fire ---" section.
+ * Firing is only executed when canFire is true (no sprint / sprint-out window).
+ */
+export interface FireCommand {
+  readonly type: 'fire';
+}
+
+export type Command = MoveCommand | LookCommand | FireCommand;
 
 /** Per-tick aggregate of the commands applied on a single tick. */
 export interface TickInput {
@@ -55,6 +64,11 @@ export interface TickInput {
   crouch: boolean;
   dyaw: number;
   dpitch: number;
+  /**
+   * True when a FireCommand was issued this tick.
+   * Processed in world.step() under the "// --- combat/fire ---" section.
+   */
+  fire: boolean;
 }
 
 export function emptyTickInput(): TickInput {
@@ -67,6 +81,7 @@ export function emptyTickInput(): TickInput {
     crouch: false,
     dyaw: 0,
     dpitch: 0,
+    fire: false,
   };
 }
 
@@ -81,9 +96,11 @@ export function foldCommands(commands: readonly Command[]): TickInput {
       input.sprint = input.sprint || (cmd.sprint ?? false);
       input.tacSprint = input.tacSprint || (cmd.tacSprint ?? false);
       input.crouch = input.crouch || (cmd.crouch ?? false);
-    } else {
+    } else if (cmd.type === 'look') {
       input.dyaw += cmd.dyaw;
       input.dpitch += cmd.dpitch;
+    } else if (cmd.type === 'fire') {
+      input.fire = true;
     }
   }
   return input;
