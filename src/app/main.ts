@@ -1,4 +1,6 @@
 import { CommandBuffer, createWorld, snapshot, step, type Command, type SimWorld } from '../sim';
+import { createTestLevel } from '../sim/levels/testLevel';
+import { createMantleTestLevel } from '../sim/levels/mantleTestLevel';
 import { GameRenderer } from '../presentation/rendering/renderer';
 import { RenderSync } from '../presentation/view/renderSync';
 import { Hud, injectHudStyles } from '../presentation/ui/hud';
@@ -20,8 +22,16 @@ async function main(): Promise<void> {
   const canvas = document.getElementById('game') as HTMLCanvasElement | null;
   if (!canvas) throw new Error('NEON BREACH: #game canvas missing');
 
-  const { seed } = bootParams();
-  const world: SimWorld = createWorld(seed);
+  const { seed, scenario } = bootParams();
+  // Load a level for deterministic E2E tests when ?scenario= is passed.
+  // This activates the capsule controller path, enabling slide/mantle/crouch.
+  const level =
+    scenario === 'test'
+      ? createTestLevel()
+      : scenario === 'mantle_test'
+        ? createMantleTestLevel()
+        : null;
+  const world: SimWorld = createWorld(seed, undefined, level);
   const commands = new CommandBuffer();
   const renderSync = new RenderSync();
   const probe = new FrameProbe();
