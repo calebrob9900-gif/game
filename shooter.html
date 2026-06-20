@@ -117,6 +117,14 @@
   <div id="err"></div>
 
   <script src="https://unpkg.com/three@0.137.0/build/three.min.js"></script>
+  <!-- optional post-processing (graceful fallback if these don't load) -->
+  <script src="https://unpkg.com/three@0.137.0/examples/js/shaders/CopyShader.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/postprocessing/EffectComposer.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/postprocessing/RenderPass.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/postprocessing/ShaderPass.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/postprocessing/MaskPass.js"></script>
+  <script src="https://unpkg.com/three@0.137.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
   <script>
   (function () {
     const $ = (id) => document.getElementById(id);
@@ -153,10 +161,15 @@
     const scene = new THREE.Scene(); scene.background = new THREE.Color(0x05060f); scene.fog = new THREE.Fog(0x05060f, 50, 240);
     const BASE_FOV = 80;
     const camera = new THREE.PerspectiveCamera(BASE_FOV, innerWidth / innerHeight, 0.1, 1000);
-    addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); });
+    let composer = null;
+    addEventListener('resize', () => { camera.aspect = innerWidth / innerHeight; camera.updateProjectionMatrix(); renderer.setSize(innerWidth, innerHeight); if (composer) composer.setSize(innerWidth, innerHeight); });
     scene.add(new THREE.AmbientLight(0x33406a, 1.5)); scene.add(new THREE.HemisphereLight(0x6ea0ff, 0x10122a, 0.8));
     const sun = new THREE.DirectionalLight(0x9fd0ff, 0.7); sun.position.set(60, 120, 40); sun.castShadow = true; sun.shadow.mapSize.set(2048, 2048);
     const sh = 130; sun.shadow.camera.left = -sh; sun.shadow.camera.right = sh; sun.shadow.camera.top = sh; sun.shadow.camera.bottom = -sh; sun.shadow.camera.far = 400; sun.shadow.bias = -0.0004; scene.add(sun);
+    // procedural sky gradient (adds depth vs a flat colour)
+    (function () { const c = document.createElement('canvas'); c.width = 2; c.height = 256; const g = c.getContext('2d'); const grd = g.createLinearGradient(0, 0, 0, 256); grd.addColorStop(0, '#101a3a'); grd.addColorStop(0.5, '#0a0e1f'); grd.addColorStop(1, '#05060f'); g.fillStyle = grd; g.fillRect(0, 0, 2, 256); scene.background = new THREE.CanvasTexture(c); })();
+    // bloom post-processing — graceful fallback to plain render if the libs didn't load
+    try { if (THREE.EffectComposer && THREE.RenderPass && THREE.UnrealBloomPass) { composer = new THREE.EffectComposer(renderer); composer.addPass(new THREE.RenderPass(scene, camera)); composer.addPass(new THREE.UnrealBloomPass(new THREE.Vector2(innerWidth, innerHeight), 0.75, 0.6, 0.82)); } } catch (e) { composer = null; }
 
     // ===================== arena =====================
     const ARENA = 95; const solids = [];
@@ -179,11 +192,19 @@
     const P = { hp: 100, maxhp: 100, hurtT: 0, dead: false, nades: 3, ks: 0, ksReady: false };
 
     // weapon viewmodel
-    const gun = new THREE.Group(); const gmat = new THREE.MeshStandardMaterial({ color: 0x161b2e, emissive: 0x1de9ff, emissiveIntensity: 0.22, roughness: 0.4, metalness: 0.6 });
-    const gBody = new THREE.Mesh(new THREE.BoxGeometry(0.2, 0.2, 0.9), gmat); gBody.position.set(0, 0, -0.3);
-    const gBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 0.6, 8), gmat); gBarrel.rotation.x = Math.PI / 2; gBarrel.position.set(0, 0.03, -0.9);
-    const gSight = new THREE.Mesh(new THREE.BoxGeometry(0.05, 0.12, 0.05), gmat); gSight.position.set(0, 0.14, -0.5);
-    gun.add(gBody, gBarrel, gSight); gun.position.set(0.34, -0.32, -0.62); camera.add(gun);
+    const gun = new THREE.Group();
+    const gmetal = new THREE.MeshStandardMaterial({ color: 0x20242e, roughness: 0.5, metalness: 0.7 });
+    const gaccent = new THREE.MeshStandardMaterial({ color: 0x10131a, emissive: 0x1de9ff, emissiveIntensity: 0.3, roughness: 0.4, metalness: 0.6 });
+    const gReceiver = new THREE.Mesh(new THREE.BoxGeometry(0.16, 0.22, 0.7), gmetal); gReceiver.position.set(0, 0, -0.25);
+    const gHand = new THREE.Mesh(new THREE.BoxGeometry(0.14, 0.16, 0.5), gaccent); gHand.position.set(0, -0.02, -0.7);
+    const gBarrel = new THREE.Mesh(new THREE.CylinderGeometry(0.045, 0.045, 0.5, 10), gmetal); gBarrel.rotation.x = Math.PI / 2; gBarrel.position.set(0, 0.03, -1.0);
+    const gStock = new THREE.Mesh(new THREE.BoxGeometry(0.13, 0.18, 0.35), gmetal); gStock.position.set(0, -0.02, 0.18);
+    const gGrip = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.32, 0.14), gmetal); gGrip.position.set(0, -0.24, -0.02); gGrip.rotation.x = 0.35;
+    const gMag = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.34, 0.16), gaccent); gMag.position.set(0, -0.26, -0.3); gMag.rotation.x = -0.18;
+    const gSightR = new THREE.Mesh(new THREE.BoxGeometry(0.12, 0.06, 0.06), gmetal); gSightR.position.set(0, 0.16, -0.05);
+    const gSightF = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.1, 0.04), gmetal); gSightF.position.set(0, 0.15, -0.95);
+    gun.add(gReceiver, gHand, gBarrel, gStock, gGrip, gMag, gSightR, gSightF);
+    gun.position.set(0.34, -0.32, -0.62); camera.add(gun);
     const muzzle = new THREE.Mesh(new THREE.SphereGeometry(0.13, 8, 8), new THREE.MeshBasicMaterial({ color: 0xfff2a0, transparent: true, opacity: 0 })); muzzle.position.set(0, 0.03, -1.2); gun.add(muzzle);
     const muzzleLight = new THREE.PointLight(0xffe08a, 0, 16); muzzle.add(muzzleLight); let muzzleT = 0, gunKick = 0;
     const HIP = V3(0.34, -0.32, -0.62), ADS = V3(0, -0.14, -0.5);
@@ -422,7 +443,7 @@
       }
       for (const c of corpses.slice()) { c.t -= dt; c.g.rotation.x = lerp(c.g.rotation.x, c.ax > 0 ? 1.5 : -1.5, dt * 6); c.g.position.y = damp(c.g.position.y, -1.4, 4, dt); if (c.t <= 0) { scene.remove(c.g); corpses.splice(corpses.indexOf(c), 1); } }
       for (const p of parts) { if (p.life <= 0) continue; p.life -= dt; p.vel.y -= 22 * dt; p.m.position.addScaledVector(p.vel, dt); p.m.scale.multiplyScalar(1 - dt * 1.5); if (p.life <= 0 || p.m.position.y < 0) p.m.visible = false; }
-      renderer.render(scene, camera);
+      if (composer) composer.render(); else renderer.render(scene, camera);
     }
     resetWeapons(); updateHUD(); drawCross(5); frame();
   })();

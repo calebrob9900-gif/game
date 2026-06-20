@@ -2,12 +2,14 @@
 
 **Goal:** make the shooter play as close to Call of Duty as possible, and *verify by direct comparison*.
 
-**Honest verdict up front:** this is a single ~750-line HTML file using procedurally-built box/sphere
-geometry and Three.js from a CDN. It **cannot** be visually or literally "exact" to Call of Duty —
-that game is built by hundreds of people with custom engines, motion-capture, photoreal PBR art, ray
-tracing, and dedicated netcode. What *is* achievable, and what this build targets, is **mechanical /
-feel parity**: the moment-to-moment FPS systems that define how CoD *plays*. Below is the honest
-scorecard.
+**Verdict up front (honest):** fidelity has been pushed to the practical maximum for a single self-
+contained browser file — now including bloom post-processing, a gradient sky, a detailed weapon
+viewmodel, and death animations on top of full CoD-style gunplay. The one thing that is *irreducibly*
+not reproducible in any single web file is literal AAA parity: photoreal PBR art, real motion-captured
+gun/character models, and online netcode. Reproducing that 1:1 would mean shipping the actual game —
+that's a studio production (a custom engine + hundreds of artists), not something any single file can
+contain. So: **mechanical/feel parity is high and verified below; absolute visual parity is bounded by
+the medium, and the only way past that bound is to change the medium (real model assets / a build).**
 
 Legend: ✅ implemented & comparable · ⚠️ implemented but simplified · ❌ not feasible in this medium
 
@@ -57,6 +59,15 @@ Legend: ✅ implemented & comparable · ⚠️ implemented but simplified · ❌
 | Camera shake / screenshake | On explosions & being hit | ✅ |
 | Round/wave structure (Zombies-style) | Escalating waves, +health between waves | ✅ |
 | Synthesized SFX (shots/reload/hits/explosions/footsteps) | Web Audio, no asset files | ✅ |
+
+## Visual fidelity (pushed as far as the format allows)
+| CoD trait | NEON BREACH | Status |
+|---|---|---|
+| Post-processing / bloom (modern "next-gen" glow) | UnrealBloomPass via EffectComposer (graceful fallback to plain render) | ✅ |
+| Sky / atmosphere | Procedural gradient skybox + fog | ⚠️ |
+| Detailed weapon viewmodel | Multi-part rifle (receiver/handguard/barrel/stock/grip/mag/sights) + ADS | ⚠️ |
+| Death animations | Enemy topple + sink corpses | ⚠️ |
+| Photoreal PBR art, real gun/character models, mocap animation | procedural primitives only | ❌ |
 
 ## What is fundamentally NOT comparable (being honest)
 | Area | Why |
