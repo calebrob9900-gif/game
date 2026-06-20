@@ -21,6 +21,8 @@ declare global {
     __perf?: { sample: (ms?: number) => PerfStats; stats: () => PerfStats };
     __pushCommand?: (cmd: Command) => void;
     __stepTo?: (tick: number) => Snapshot;
+    /** Last hitmarker variant shown ('normal' | 'head' | 'kill'). T-120. */
+    __lastHitmarker?: string | null;
   }
 }
 
@@ -38,6 +40,8 @@ export function installInstrumentation(api: Instrumentation): (ready: boolean) =
   w.__pushCommand = (cmd: Command) => api.pushCommand(cmd);
   w.__stepTo = (tick: number) => api.stepTo(tick);
   w.__perf = api.perf();
+  // T-120: initialised null; set to last hitmarker variant by the event handler in main.ts.
+  w.__lastHitmarker = null;
   return (ready: boolean) => {
     w.__GAME_READY__ = ready;
   };

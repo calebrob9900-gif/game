@@ -185,11 +185,15 @@ export interface GameEvents extends Record<string, unknown> {
    *   targetIndex — index in world.ecs.entities
    *   region      — the body region that was struck
    *   amount      — damage applied (damageClose × mult[region])
+   *   lethal      — true if this hit reduced the target's health to 0 (kill)
+   *                 (T-120: minimal backward-compatible addition for hitmarker kill variant)
    */
   hit: {
     targetIndex: number;
     region: HitRegion;
     amount: number;
+    /** True when this hit killed the target (health reached 0). Added T-120. */
+    lethal: boolean;
   };
 }
 
@@ -579,11 +583,15 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
           const dmg = weapon.damageClose * mult;
           // Apply damage (clamp to 0)
           target.health = Math.max(0, target.health - dmg);
-          // Emit hit event (presentation/effects can react to this)
+          // Emit hit event (presentation/effects can react to this).
+          // lethal is true when the target was just killed (health reached 0).
+          // T-120: lethal flag used by hitmarker system to show kill variant.
+          const lethal = target.health <= 0;
           world.events.emit('hit', {
             targetIndex: hit.targetIndex,
             region: hit.region,
             amount: dmg,
+            lethal,
           });
         }
       }
