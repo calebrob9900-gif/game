@@ -12,7 +12,9 @@ export default tseslint.config(
   {
     ignores: [
       'dist',
+      'dist-test',
       'node_modules',
+      '.claude',
       'coverage',
       'playwright-report',
       'test-results',
