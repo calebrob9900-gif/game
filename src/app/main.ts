@@ -5,6 +5,7 @@ import { GameRenderer } from '../presentation/rendering/renderer';
 import { RenderSync } from '../presentation/view/renderSync';
 import { Hud, injectHudStyles } from '../presentation/ui/hud';
 import { PointerLook } from '../presentation/input-capture/pointerLook';
+import { AudioManager } from '../presentation/audio/audioManager';
 import { FixedLoop } from './loop';
 import { FrameProbe } from './perf';
 import { installInstrumentation } from './instrumentation';
@@ -42,6 +43,10 @@ async function main(): Promise<void> {
   injectHudStyles();
   const hud = new Hud(document.body);
 
+  // Audio system — subscribes to sim events, updates listener from camera each frame.
+  // Instantiated before the loop starts so event subscriptions are active from tick 0.
+  const audioManager = new AudioManager(world.events);
+
   renderSync.push(snapshot(world));
 
   const stepSim = (): void => {
@@ -56,6 +61,20 @@ async function main(): Promise<void> {
       renderer.render();
       // Update HUD from the current sim snapshot (DOM writes only when values change).
       hud.update(snapshot(world));
+      // Sync spatial listener with camera transform each frame.
+      // camera.rotation uses YXZ order: yaw = rotation.y, pitch = rotation.x.
+      const cam = renderer.camera;
+      const cy = cam.rotation.y; // yaw
+      const cp = cam.rotation.x; // pitch
+      // Forward vector (yaw + pitch → -Z forward):
+      //   fwdX =  cos(pitch) * sin(yaw)
+      //   fwdY = -sin(pitch)
+      //   fwdZ = -cos(pitch) * cos(yaw)
+      const cosPitch = Math.cos(cp);
+      const fwdX = cosPitch * Math.sin(cy);
+      const fwdY = -Math.sin(cp);
+      const fwdZ = -cosPitch * Math.cos(cy);
+      audioManager.updateListener(cam.position.x, cam.position.y, cam.position.z, fwdX, fwdY, fwdZ);
     },
     onFrame: (now) => probe.record(now),
   });
@@ -86,6 +105,32 @@ async function main(): Promise<void> {
 
   // Wire pointer-lock look capture: click canvas → lock, raw mouse → LookCommands.
   const pointerLook = new PointerLook(canvas, commands, { sens: 2.0 });
+  // Expose audio instrumentation hook (dev/test only, stripped in production).
+  // Allows E2E tests to read scheduled sound counts without reading audio state.
+  if (import.meta.env.DEV || import.meta.env.MODE === 'test') {
+    (window as Window & { __audio?: { scheduled: () => number } }).__audio = {
+      scheduled: () => audioManager.getScheduledCount(),
+    };
+
+    // __addTarget: place a damageable dummy entity directly in front of the
+    // player at a specified distance. For E2E audio tests — adds a hitscan
+    // target without modifying sim source.
+    (window as Window & { __addTarget?: (distanceM: number) => void }).__addTarget = (
+      distanceM: number,
+    ) => {
+      const snap = snapshot(world);
+      const yaw = snap.player.yaw;
+      // Place target in the direction the player is facing (forward = −Z in yaw basis)
+      const tx = snap.player.position.x + Math.sin(yaw) * distanceM;
+      const ty = snap.player.position.y; // same eye height level
+      const tz = snap.player.position.z - Math.cos(yaw) * distanceM;
+      world.ecs.add({
+        position: { x: tx, y: ty, z: tz },
+        health: 100,
+        damageable: true,
+      });
+    };
+  }
 
   await renderer.init();
   probe.backend = renderer.backend;

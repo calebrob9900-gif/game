@@ -21,6 +21,13 @@ declare global {
     __perf?: { sample: (ms?: number) => PerfStats; stats: () => PerfStats };
     __pushCommand?: (cmd: Command) => void;
     __stepTo?: (tick: number) => Snapshot;
+    /** Audio instrumentation: total sounds scheduled (dev/test only). */
+    __audio?: { scheduled: () => number };
+    /**
+     * Add a damageable dummy target entity in front of the player
+     * at the given distance in metres (dev/test only, for audio E2E).
+     */
+    __addTarget?: (distanceM: number) => void;
   }
 }
 
