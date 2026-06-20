@@ -45,8 +45,12 @@ describe('deterministic replay', () => {
   it('matches the committed GOLDEN world hash (re-baseline is a reviewed act)', () => {
     // Pins the exact end-state of the recorded scenario. A change here means a
     // deliberate gameplay/physics change — re-baseline only via reviewed PR.
-    // Re-baselined for T-101: capsule controller replaced flat-ground clamp.
-    // Old hash: 968e8e8b (flat-ground), new hash: b9debaa4 (capsule+AABB model).
+    //
+    // NOTE: this SCENARIO calls createWorld(seed) with NO level, so step() runs the
+    // FLAT-GROUND FALLBACK path (not the capsule controller — that path is pinned in
+    // capsulePhysics.test.ts). Re-baselined 968e8e8b → b9debaa4 for T-101 because
+    // DEFAULT_SETTINGS.moveSpeed (7→6) and jumpSpeed (7→6.3) were tuned to research/03 §7,
+    // which feeds this fallback path.
     const GOLDEN = 'b9debaa4';
     expect(runReplay(SCENARIO).hash).toBe(GOLDEN);
   });

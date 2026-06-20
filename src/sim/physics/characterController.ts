@@ -38,7 +38,7 @@ export interface CapsuleShape {
 /** Default player capsule: 1.8 m tall, 0.3 m radius. */
 export const PLAYER_CAPSULE: CapsuleShape = {
   radius: 0.3,
-  halfHeight: 0.6, // (1.8 - 0.6) / 2 = 0.6
+  halfHeight: 0.6, // halfHeight = (1.8 - 2*0.3) / 2 = 0.6
 };
 
 /**
@@ -129,6 +129,13 @@ export function resolveCapsuleVsBox(
 
   // Expand AABB by capsule radius (Minkowski sum of sphere).
   // Clamp capsule axis (which is vertical) to AABB y-range.
+  // TODO(correctness): this clamps the box-center range then re-clamps to the
+  // segment, which deviates from the textbook capsule-vs-AABB closest point
+  // (clamp box center Y to [segBot,segTop]). For boxes whose vertical half-extent
+  // is smaller than the capsule radius (thin trim/ledges) it can pick the up axis
+  // as the min-overlap axis and classify a wall hit as a floor. The current test
+  // levels use thick colliders (walls ≥4 m, ground 1 m) so this is not exercised;
+  // revisit when thin geometry is added (T-132/T-604).
   const clampedY = Math.max(cy - box.half.y, Math.min(cy + box.half.y, 0.5 * (segBotY + segTopY)));
 
   // Find the closest point on capsule segment to the expanded AABB center line

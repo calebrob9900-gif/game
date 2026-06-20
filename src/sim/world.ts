@@ -204,11 +204,12 @@ export function step(world: SimWorld, commands: readonly Command[]): void {
     vel.x += (targetX - vel.x) * Math.min(1, s.accel * DT * 0.25);
     vel.z += (targetZ - vel.z) * Math.min(1, s.accel * DT * 0.25);
 
-    // Jump
+    // Jump — emit BEFORE mutating state (onGround still true at event time),
+    // matching the capsule path so listeners observe identical world state.
     if (input.jump && p.onGround) {
+      world.events.emit('jump', { tick: world.tick });
       vel.y = s.jumpSpeed;
       p.onGround = false;
-      world.events.emit('jump', { tick: world.tick });
     }
 
     // Gravity + integrate

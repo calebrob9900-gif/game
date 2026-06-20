@@ -103,7 +103,12 @@ resolved against **AABB box colliders** from the level descriptor (`src/sim/leve
   industry-standard "simple auth + rich client" split.
 - **Movement params** (gravity, accel, friction, speed) come from `research/03 §7`:
   maxRunSpeed ~6 m/s, groundAccel 50–90, friction 6–10, gravity 18–25 m/s².
-- The golden hash in `tests/replay/determinism.test.ts` was **intentionally re-baselined**
-  when this controller replaced the flat-ground clamp in `world.ts`. The old hash `968e8e8b`
-  is replaced by the new hash produced by the capsule-vs-AABB movement model. This is a
-  deliberate, reviewed behavior change.
+- Two golden hashes pin the two movement paths:
+  - `tests/replay/determinism.test.ts` exercises the **flat-ground fallback** path
+    (`createWorld(seed)` with no level). Its golden was re-baselined `968e8e8b → b9debaa4`
+    because `DEFAULT_SETTINGS.moveSpeed` (7→6) and `jumpSpeed` (7→6.3) were tuned to
+    research/03 §7 — those settings feed the fallback path. (The capsule controller is NOT
+    exercised by this scenario.)
+  - `tests/replay/capsulePhysics.test.ts` pins the **capsule-vs-AABB** path (golden
+    `2be1af91`), which IS the path used when a level is loaded.
+  Both re-baselines are deliberate, reviewed behavior changes.
