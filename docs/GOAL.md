@@ -10,15 +10,19 @@ Copy-paste this as your `/goal` (it's written to be **demonstrable from the tran
 all the goal evaluator can see — see `WORKFLOW.md §1`):
 
 ```
-/goal Execute docs/MASTER_PLAN.md by working through docs/TASKS.md in order. For each unchecked
-task: delegate it to a game-feature-builder subagent, then run `bash scripts/verify.sh` and paste
-its full output, then have a reviewer subagent review the diff, then commit and push, then flip the
-task's checkbox to [x] with the commit SHA. Honor the phase gates and the determinism/sim-split
-rules. The goal is COMPLETE only when: (a) every checkbox in docs/TASKS.md is [x] (or [!] with a
-stated reason), AND (b) the latest `bash scripts/verify.sh` run shown in the transcript exited 0
-with all five verifiers passing, AND (c) docs/COMPETITORS.md shows a v1 weighted total > 3.7 with
-feel pillars each >= 4.0. After each task, report: which task, verify.sh exit code, and tasks
-remaining. If you cannot finish in this run, commit progress and stop; I will re-run this goal.
+/goal Build NEON BREACH to a finished v1 per docs/GAME_DESIGN.md, executing docs/MASTER_PLAN.md and
+working through docs/TASKS.md in order. The project is NOT scaffolded yet — START with Phase 0 (T-001…) to create
+the real Vite+TypeScript+Three.js(WebGPU)+Rapier project, then continue through every phase. Use
+ONLY free/CC0 assets (Kenney/Quaternius/KayKit, Poly Haven/ambientCG, Mixamo) — no paid or
+AI-generated assets (locked v1 policy). For each unchecked task: delegate it to a
+game-feature-builder subagent, then run `bash scripts/verify.sh` and paste its full output, then
+have a reviewer subagent review the diff, then commit and push, then flip the task's checkbox to
+[x] with the commit SHA. Honor the phase gates and the determinism / sim-presentation rules. The
+goal is COMPLETE only when: (a) every checkbox in docs/TASKS.md is [x] (or [!] with a stated
+reason), AND (b) the latest `bash scripts/verify.sh` shown in the transcript exited 0 with all five
+verifiers passing, AND (c) docs/COMPETITORS.md shows a v1 weighted total > 3.7 with feel pillars
+each >= 4.0. After each task report: which task, verify.sh exit code, and tasks remaining. Commit
++ push after every task so progress survives if the session ends.
 ```
 
 ## Completion condition (what "done" means)
@@ -29,10 +33,24 @@ remaining. If you cannot finish in this run, commit progress and stop; I will re
 
 When all three hold and are visible in the transcript, the goal auto-clears.
 
+## Hands-off mode (recommended — "start it and let it run")
+Because a single `/goal` releases after a chunk (~8-block safety override, `WORKFLOW.md §5`), the
+way to drive it to the **final product from one action** is to wrap it in `/loop`, which
+re-invokes it on an interval until everything is done:
+
+```
+/loop 30m /goal Build NEON BREACH to a finished v1 ... (the full prompt above)
+```
+
+Each loop tick resumes from the first unchecked task (progress is committed), so it keeps building
+across the auto-releases until the completion condition holds, then stops. This is the intended
+"next session, start the goal, get the final product" workflow.
+
 ## How to run it well
-- **Re-run on release.** A single `/goal` may stop after a chunk (the ~8-block safety override,
-  `WORKFLOW.md §5`). Just paste the same goal again — it resumes from the first unchecked task
-  because all progress is committed. Optionally `/loop 30m /goal …` to auto-continue.
+- **Or re-run manually on release.** If you don't use `/loop`, just paste the same `/goal` again
+  whenever it stops — it resumes from the first unchecked task because all progress is committed.
+- **Fresh session is fine.** Start a new session, (optionally) confirm no stale goal is active,
+  then run the command above. The `SessionStart` hook reinstalls deps automatically.
 - **Watch a PR (optional).** If a PR is opened, you can subscribe to its CI and let failures
   auto-fix.
 - **Trust the gate, not vibes.** Progress = checkboxes flipped + `verify.sh` green in the

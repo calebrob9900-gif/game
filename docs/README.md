@@ -4,7 +4,8 @@ The plan to build a browser-based, headline-quality FPS the right way, and to dr
 build + verification from **one `/goal`**.
 
 ## Start here
-1. **`MASTER_PLAN.md`** — vision, honest scope/ceiling, v1 game definition, tech stack, roadmap.
+1. **`GAME_DESIGN.md`** — the locked creative + scope spec (what the game IS). Read first.
+2. **`MASTER_PLAN.md`** — honest scope/ceiling, tech stack, roadmap (serves GAME_DESIGN).
 2. **`GOAL.md`** — the exact `/goal` prompt to start the build + the completion condition.
 3. **`TASKS.md`** — the machine-checkable backlog the build executes (Phases 0–5).
 4. **`WORKFLOW.md`** — how `/goal` + subagents + verify.sh drive it, and survive the ephemeral env.

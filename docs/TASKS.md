@@ -1,166 +1,177 @@
 # NEON BREACH — Task Backlog (the checklist `/goal` executes)
 
-> The ordered, machine-checkable backlog. The build works through this top-to-bottom.
+> Serves `docs/GAME_DESIGN.md`. The build works through this top-to-bottom.
 > **Legend:** `[ ]` todo · `[x]` done (append commit SHA) · `[!]` blocked/infeasible (state why).
-> **Each task lists acceptance criteria + which verifier proves it** (`VERIFICATION.md`).
+> Each task lists acceptance criteria + the verifier that proves it (`VERIFICATION.md`).
 > A task is done only when `scripts/verify.sh` is green **and** its acceptance criteria pass
-> **and** a `reviewer` subagent approves the diff **and** it's committed+pushed (`VERIFICATION.md §3`).
-> Do not start a phase until the previous phase's **EXIT GATE** passes.
-> Verifier tags: V1 static · V2 logic/replay · V3 E2E · V4 visual · V5 perf.
+> **and** a `reviewer` subagent approves **and** it's committed+pushed.
+> Don't start a phase until the previous phase's **EXIT GATE** passes.
+> Verifiers: V1 static · V2 logic/replay · V3 E2E · V4 visual · V5 perf.
+> Scope = **go big**, assets = **free/CC0 only**, opponents = **bots** (online MP = Phase 8, deferred).
 
 ---
 
 ## PHASE 0 — Foundation & verification harness
 
-### Epic 0.A — Project scaffolding
-- [ ] T-001 Init `package.json`, Vite, TypeScript (strict), entry `index.html` + `src/app/main.ts` — acceptance: `pnpm dev` serves; `pnpm build` produces a bundle. [V1]
-- [ ] T-002 ESLint + Prettier + `tsc --noEmit`; add the **import-boundary lint rule** (`presentation`→`sim` only) — acceptance: lints clean; a deliberate `three` import inside `src/sim` fails lint. [V1]
-- [ ] T-003 Add deps: three, @dimforge/rapier3d-compat, miniplex, howler, recast-navigation-js, yuka; dev: vitest, fast-check, @playwright/test, lighthouse, memlab. Vendor Three.js or allowlist CDN. — acceptance: `pnpm install` clean; app imports three and renders nothing-errors-free. [V1]
-- [ ] T-004 `scripts/verify.sh` real implementation chaining V1–V5 (each its own step, aggregate exit). Stub V3/V4/V5 to pass on the empty app initially, wired to real commands. — acceptance: `bash scripts/verify.sh` exits 0 and prints a per-verifier summary. [V1–V5]
-- [ ] T-005 `.github/workflows/ci.yml`: install→verify on PR/push; single required `ci-passed` aggregator; Pages deploy on green. — acceptance: workflow file validates; CI green on the scaffold. [V1]
-- [ ] T-006 `.claude/` machinery present & committed: `agents/{game-feature-builder,verifier,reviewer,asset-fetcher}.md`, `settings.json` SessionStart hook (gated on `CLAUDE_CODE_REMOTE`, reinstalls deps). — acceptance: files exist, valid; hook script runs without error. [V1]
-- [ ] T-007 `perf-budgets.json` with initial budgets (p95 ≤16.6ms, draw calls <100, bundle/asset sizes, memory soak). — acceptance: file parses; V5 reads it. [V5]
+- [ ] T-001 Init `package.json`, Vite, TypeScript (strict), `index.html` + `src/app/main.ts` — acceptance: `pnpm dev` serves, `pnpm build` bundles. [V1]
+- [ ] T-002 ESLint + Prettier + `tsc --noEmit` + **import-boundary rule** (`presentation`→`sim` only) — acceptance: a `three` import in `src/sim` fails lint. [V1]
+- [ ] T-003 Deps: three, @dimforge/rapier3d-compat, miniplex, howler, recast-navigation-js, yuka; dev: vitest, fast-check, @playwright/test, lighthouse, memlab. Vendor three or allowlist CDN. — acceptance: install clean; app imports three error-free. [V1]
+- [ ] T-004 Real `scripts/verify.sh` chaining V1–V5 (each a step, aggregate exit), wired to pnpm scripts. — acceptance: exits 0 on the scaffold; prints per-verifier summary. [V1–V5]
+- [ ] T-005 `.github/workflows/ci.yml`: install→verify on PR/push; required `ci-passed` aggregator; Pages deploy on green. — acceptance: CI green on scaffold. [V1]
+- [ ] T-006 Confirm `.claude/` machinery committed (agents, settings, SessionStart hook works). — acceptance: hook runs; agents valid. [V1]
+- [ ] T-007 `perf-budgets.json` (p95 ≤16.6ms, draw calls <100, bundle/asset/memory budgets). — acceptance: parses; V5 reads it. [V5]
+- [ ] T-010 Fixed-timestep loop (60Hz) + interpolated render + frame-time clamp. — acceptance: replay: same inputs ⇒ identical tick count + hash twice. [V2]
+- [ ] T-011 Seeded PRNG in sim; ban `Math.random()`/`Date.now()` in `src/sim` (lint). — acceptance: lint blocks it; reproducible. [V1][V2]
+- [ ] T-012 miniplex ECS + ordered SystemRunner + typed event bus. — acceptance: unit tests for queries + order. [V2]
+- [ ] T-013 `hashWorld(state)` over gameplay state. — acceptance: stable, changes on change, unit-tested. [V2]
+- [ ] T-014 Command/input types + buffer applied at tick boundaries. — acceptance: deterministic replay. [V2]
+- [ ] T-015 Sim/presentation split + read-only snapshot + `RenderSync` interpolation. — acceptance: import-boundary green. [V1]
+- [ ] T-016 Instrumentation contract (`__GAME_READY__/__GAME_STATE__/__perf/__pushCommand/__stepTo/?seed/?scenario`), stripped from prod. — acceptance: present dev/test, absent prod. [V1][V3]
+- [ ] T-017 Renderer bootstrap: WebGPU + WebGL2 fallback; lit "hello scene". — acceptance: E2E loads, `__GAME_READY__`, no console errors, non-blank frame. [V3]
+- [ ] T-018 First visual baseline (frozen frame) committed. — acceptance: V4 matches in pinned image. [V4]
+- [ ] T-019 Perf probe + Lighthouse CI wired. — acceptance: V5 runs, passes initial budgets. [V5]
 
-### Epic 0.B — Deterministic engine core
-- [ ] T-010 Fixed-timestep loop (60Hz accumulator) decoupled from interpolated render; frame-time clamp. — acceptance: replay test: same inputs ⇒ identical tick count + state hash across two runs. [V2]
-- [ ] T-011 Seeded PRNG in sim state; ban `Math.random()`/`Date.now()` in `src/sim` (lint). — acceptance: lint blocks `Math.random` in sim; PRNG reproducible. [V1][V2]
-- [ ] T-012 miniplex ECS world + `System`/`SystemRunner` (ordered) + typed event bus. — acceptance: unit tests for entity add/remove/query + system order. [V2]
-- [ ] T-013 `hashWorld(state)` (positions/vel/health/ammo/rng cursor). — acceptance: stable hash; changes when state changes; unit-tested. [V2]
-- [ ] T-014 Command/input types + buffer (`Move/Look/Fire/Reload/Switch`) applied at tick boundaries. — acceptance: commands replay deterministically. [V2]
-- [ ] T-015 Sim/presentation split skeleton + read-only snapshot + `RenderSync` interpolation. — acceptance: presentation reads snapshot; import-boundary lint green. [V1]
-
-### Epic 0.C — Test instrumentation + first render
-- [ ] T-016 Instrumentation contract (`__GAME_READY__`, `__GAME_STATE__`, `__perf`, `__pushCommand`, `__stepTo`, `?seed/?scenario`), stripped from prod builds. — acceptance: present in dev/test build, absent in prod build. [V1][V3]
-- [ ] T-017 Renderer bootstrap: WebGPURenderer with automatic WebGL2 fallback; render a lit "hello cube". — acceptance: E2E loads, `__GAME_READY__` true, no console errors, non-blank first frame. [V3]
-- [ ] T-018 First visual baseline (frozen frame via `__stepTo`, fixed seed/camera) committed. — acceptance: V4 snapshot matches baseline in the pinned Playwright image. [V4]
-- [ ] T-019 First perf probe run wired (`__perf`) + Lighthouse CI on the scaffold. — acceptance: V5 runs, reports numbers, passes initial budgets. [V5]
-
-**PHASE 0 EXIT GATE:** `verify.sh` green (V1–V5) on a real-but-minimal app; CI green; deployed to Pages; one replay test + one visual baseline + one perf run all passing.
+**EXIT GATE P0:** `verify.sh` green (V1–V5) on a minimal real app; CI green; deployed to Pages; one replay test + one visual baseline + one perf run pass.
 
 ---
 
-## PHASE 1 — Core FPS vertical slice (the feel)
+## PHASE 1 — Core first-person feel (movement + gunplay)
 
-### Epic 1.A — Player controller & movement (`research/03`, `research/12`)
-- [ ] T-101 Physics spike: prototype Rapier `KinematicCharacterController` vs three-mesh-bvh capsule; pick one; document decision. — acceptance: decision recorded in ARCHITECTURE; chosen controller moves a capsule against a test level deterministically. [V2]
-- [ ] T-102 Ground movement: finite accel + high friction (enables counter-strafe), per-weapon move multipliers. — acceptance: replay test reproduces position curve; values match `research/03`. [V2]
-- [ ] T-103 Sprint + tac-sprint + sprint-to-fire delay (100–250ms). — acceptance: E2E: firing blocked during sprint-out window. [V3]
-- [ ] T-104 Crouch (stance height/speed/spread) + jump (gravity ~18–25 m/s²) + slide + auto-mantle (~1.0–1.3m). — acceptance: E2E mantle over a 1.2m ledge; replay-stable. [V2][V3]
-- [ ] T-105 Pointer-lock look: raw mouse (no accel/smoothing), sensitivity as DPI/cm-360/eDPI. — acceptance: input→yaw/pitch deterministic given a movement sequence. [V2]
+- [ ] T-101 Physics/controller spike: Rapier `KinematicCharacterController` vs three-mesh-bvh; pick + document. — acceptance: capsule moves deterministically vs a test level. [V2]
+- [ ] T-102 Ground movement: accel + friction (counter-strafe), per-weapon move mult. — acceptance: replay reproduces position curve; params per `research/03`. [V2]
+- [ ] T-103 Sprint + **tactical sprint** + sprint-to-fire delay. — acceptance: E2E: fire blocked during sprint-out window. [V3]
+- [ ] T-104 Crouch + jump (gravity ~18–25 m/s²). — acceptance: replay-stable heights. [V2]
+- [ ] T-105 **Slide** (momentum, duration, slow-down) + **vault/mantle** (auto over ~1–1.3 m). — acceptance: E2E slide over distance + mantle a ledge; replay-stable. [V2][V3]
+- [ ] T-106 Pointer-lock look: raw mouse (no accel), sensitivity DPI/cm-360/eDPI. — acceptance: input→yaw/pitch deterministic. [V2]
+- [ ] T-110 Data-driven weapon schema (single source of truth). — acceptance: schema validated; AR loads from data. [V1][V2]
+- [ ] T-111 Hitscan + region hitboxes (head/chest/limb) + multipliers (head ×1.4–1.6, limb ×0.8–0.9). — acceptance: replay damage by region. [V2]
+- [ ] T-112 Two-layer recoil (fixed pattern moves bullets + recovering visual kick). — acceptance: replay N-round pattern; tunable recovery. [V2]
+- [ ] T-113 Accuracy: first-shot accurate + movement/stance/fire bloom; dynamic crosshair. — acceptance: replay spread states; E2E crosshair bloom. [V2][V3]
+- [ ] T-114 ADS: FOV lerp + viewmodel to sights + correct ADS sens scaling. — acceptance: unit test scaling math; E2E ADS FOV. [V2][V3]
+- [ ] T-115 Reload (timed, reserve, cancel) + ammo + weapon switch (swap lockout). — acceptance: E2E flows. [V3]
+- [ ] T-116 Damage & TTK tuning (fast readable ~0.25–0.6s) + falloff. — acceptance: replay TTK in band. [V2]
+- [ ] T-120 Juice: hitmarkers (normal/head/kill). — acceptance: E2E class changes on headshot. [V3]
+- [ ] T-121 Trauma screenshake + 30–80ms hitstop. — acceptance: deterministic; visible in state. [V2][V3]
+- [ ] T-122 Pooled muzzle flash + tracers + impact decals + particles. — acceptance: V5 no GC spikes sustained fire; visual baseline. [V4][V5]
+- [ ] T-123 FP viewmodel: idle sway + bob + ADS pose + fire kick (frame-rate independent). — acceptance: visual baselines; deterministic poses. [V4]
+- [ ] T-130 HUD core: health, ammo/reserve, dynamic crosshair. — acceptance: E2E reads `__GAME_STATE__` matches HUD. [V3]
+- [ ] T-131 Audio core: Howler + spatial listener; weapon fire (layered), footsteps, impacts; AudioContext unlock. — acceptance: E2E fire schedules audio; no errors. [V3]
+- [ ] T-132 Greybox urban test map (CC0 kit) + `*.level.json` (bounds/cover/spawns). — acceptance: loads; collider present; spawns valid. [V2][V3]
+- [ ] T-133 Shootable bot stub (placeholder target with health). — acceptance: replay: shots kill it; respawns. [V2]
 
-### Epic 1.B — Weapon system & gunplay (`research/03`)
-- [ ] T-110 Data-driven weapon schema (single source of truth: mag/reserve/rate/dmg/head/recoil/spread/ADS/reload). — acceptance: schema validated; 1 weapon (AR) loads from data. [V1][V2]
-- [ ] T-111 Hitscan firing + bone/region hitboxes (head/chest/stomach/limb) + headshot ×1.4–1.6, limb ×0.8–0.9. — acceptance: replay: shot at head vs limb yields correct damage. [V2]
-- [ ] T-112 Two-layer recoil: fixed per-weapon aim pattern (+ light random tail) that moves bullets; separate visual/camera kick that fully recovers (~100–150ms). — acceptance: replay: N-round burst reproduces the pattern; tunable autoRecoverFraction. [V2]
-- [ ] T-113 Accuracy: first-shot-accurate; bloom from movement/jump/consecutive fire; reset on stop; dynamic crosshair maps to live cone. — acceptance: replay of spread states; E2E crosshair gap changes with movement. [V2][V3]
-- [ ] T-114 ADS: FOV lerp (150–300ms) + viewmodel to aim socket + **correct ADS sensitivity scaling** (`tan(adsFov/2)/tan(baseFov/2)`). — acceptance: unit test of the scaling math; E2E ADS toggles FOV. [V2][V3]
-- [ ] T-115 Reload (timed, from reserve, reload-cancel) + ammo/reserve + weapon switch (swap lockout). — acceptance: E2E: empty→reload refills from reserve; switch blocks fire during swap. [V3]
-- [ ] T-116 Damage & TTK tuning to readable target (~0.35–0.7s AR), damage falloff steps. — acceptance: replay TTK within target band at set ranges. [V2]
-
-### Epic 1.C — Combat juice & feedback (`research/03`)
-- [ ] T-120 Hitmarkers (normal/headshot/kill variants). — acceptance: E2E: hitmarker class changes on headshot. [V3]
-- [ ] T-121 Trauma-based screenshake (`trauma²` + noise) + 30–80ms hitstop. — acceptance: deterministic given trauma input; visible in E2E state. [V2][V3]
-- [ ] T-122 Pooled muzzle flash + tracers + impact decals + particles (no per-shot allocation). — acceptance: V5 shows no GC spikes during sustained fire; visual baseline of a shot. [V4][V5]
-- [ ] T-123 Procedural viewmodel: idle sway + bob + ADS pose + fire kick (frame-rate independent). — acceptance: visual baseline frames; deterministic poses. [V4]
-
-### Epic 1.D — First enemy, waves, HUD, audio
-- [ ] T-130 One enemy archetype (chaser) with health + simple straight-line move + melee (placeholder AI). — acceptance: replay: enemy reaches player and deals damage. [V2]
-- [ ] T-131 Spawn + basic wave loop (start → spawn N → all dead → next wave + heal). — acceptance: E2E: clearing a wave advances the counter. [V3]
-- [ ] T-132 HUD: health, ammo/reserve, dynamic crosshair, wave, score. — acceptance: E2E reads values from `__GAME_STATE__` and they match HUD. [V3]
-- [ ] T-133 Audio core: Howler + spatial listener sync; weapon fire (layered), footsteps (surface), impacts, enemy, hitmarker; AudioContext unlock on gesture. — acceptance: E2E: firing schedules audio nodes (assert via test hook); no errors. [V3]
-- [ ] T-134 Greybox "Arena 01" from a modular CC0 kit + data-driven `arena01.level.json` (bounds/cover/spawns). — acceptance: level loads; collider present; spawns inside bounds. [V2][V3]
-
-**PHASE 1 EXIT GATE:** a player can fight and clear waves and it feels good; gunplay/movement params match `research/03`; ≥1 firefight replay test green; verify.sh green; record P1 rubric self-score in `COMPETITORS.md` (feel pillars trending ≥3.5).
+**EXIT GATE P1:** a player can move (full kit) and shoot in FP and it feels good; gunplay/movement match `research/03`; ≥1 firefight replay test; verify.sh green; record P1 rubric self-score.
 
 ---
 
-## PHASE 2 — AI & encounter depth (`research/04`, `research/11`)
+## PHASE 2 — Combat AI & bots (opponents that play like people)
 
-### Epic 2.A — AI foundation
-- [ ] T-201 Behavior Tree core (selector/sequence/decorator/leaf) + Blackboard. — acceptance: unit tests for BT evaluation order. [V2]
-- [ ] T-202 Utility scorer (target/cover/push-vs-retreat selection). — acceptance: unit test: picks best-scored option. [V2]
-- [ ] T-203 Navmesh via recast-navigation-js baked from level collision + Crowd (separation). — acceptance: agents path around cover; no clumping in E2E. [V3]
-- [ ] T-204 Perception: vision cones (focus/normal/peripheral) + LOS raycast + hearing spheres wired to SFX events. — acceptance: replay: enemy detects player only within cone+LOS / on sound. [V2]
-- [ ] T-205 Awareness state machine (Unaware→Suspicious→Alert/Search→Combat) + last-known-position investigation. — acceptance: replay transitions through states + investigates LKP. [V2]
+- [ ] T-201 Behavior Tree core (selector/sequence/decorator/leaf) + Blackboard. — acceptance: unit tests for eval order. [V2]
+- [ ] T-202 Utility scorer (target/cover/push-vs-retreat). — acceptance: unit: picks best option. [V2]
+- [ ] T-203 Navmesh (recast-navigation-js) from level collision + Crowd (separation). — acceptance: agents path around cover, no clumping. [V3]
+- [ ] T-204 Perception: vision cones + LOS + hearing (wired to SFX) + awareness states + LKP. — acceptance: replay detection only within cone+LOS / on sound; investigates LKP. [V2]
+- [ ] T-210 **Bot-as-player controller**: bots drive the SAME movement/aim/fire systems as the player (not a separate hack). — acceptance: a bot moves/aims/fires via player command API; replay-stable. [V2]
+- [ ] T-211 Combat behaviors: move-to-cover, peek-fire, ranged LOS-gated fire, reload, retreat-when-low. — acceptance: E2E: bot uses cover + peeks. [V3]
+- [ ] T-212 Flanking + squad coordinator (shared knowledge, roles, bounding overwatch). — acceptance: replay: 2+ bots take different routes to flank. [V2]
+- [ ] T-213 Grenade use (flush a camper). — acceptance: replay throw. [V2]
+- [ ] T-214 Fair difficulty scaling (reaction time + converging aim cone; never aimbot). — acceptance: replay: accuracy scales by setting, not perfect. [V2]
+- [ ] T-215 AI LOD + time-slicing (perception/plan 5–10Hz, staggered, path-replan cap) ≤3–5ms/frame for 10–16 bots. — acceptance: V5 frame budget with 12 bots. [V5]
 
-### Epic 2.B — Combat behaviors
-- [ ] T-210 Cover system: find LOS-breaking points off cover edges; move-to-cover; peek-fire. — acceptance: E2E: enemy breaks LOS behind a pillar then peeks. [V3]
-- [ ] T-211 Ranged fire with LOS gating + fair accuracy model (reaction time + converging aim cone, never perfect). — acceptance: replay: blocked LOS = no hit; accuracy scales with difficulty not cheating. [V2]
-- [ ] T-212 Flanking + squad coordinator (shared knowledge, role assignment, bounding overwatch). — acceptance: replay: 2+ enemies take different routes to flank. [V2]
-- [ ] T-213 Suppression toward LKP + retreat-to-cover when low. — acceptance: replay behaviors trigger on thresholds. [V2]
-- [ ] T-214 Enemy grenade flush (reuse arc/AoE). — acceptance: replay: enemy throws to flush a camping player. [V2]
-- [ ] T-215 ≥4 enemy archetypes (chaser/fast/tank/ranged) with distinct stats + behaviors. — acceptance: each archetype's defining behavior covered by a test. [V2]
-- [ ] T-216 AI LOD + time-slicing (perception/plan at 5–10Hz, staggered, path re-plan cap) within ~3–5ms/frame for 8–16 agents. — acceptance: V5: frame budget holds with 12 active agents. [V5]
-
-### Epic 2.C — Encounter design & player kit
-- [ ] T-220 Wave director with intensity pacing (Build→Peak 3–5s→Fade→Relax 30–45s) + spawn rules (min/max distance, max-alive cap). — acceptance: replay: spawn timing/counts follow the curve. [V2]
-- [ ] T-221 Between-wave economy: currency on kills, buy stations (weapons/ammo/upgrades). — acceptance: E2E: buy refills/upgrades; currency math correct. [V3]
-- [ ] T-222 Player grenades (lethal + tactical) with arc + AoE/effect. — acceptance: E2E throw + damage falloff. [V3]
-- [ ] T-223 One killstreak/ability (e.g., airstrike) earned by streak. — acceptance: E2E: triggers at threshold, damages enemies. [V3]
-- [ ] T-224 Anti-turtle mechanics (rotate threat direction, relocate resupply). — acceptance: replay: camping a corner spawns flankers. [V2]
-
-**PHASE 2 EXIT GATE:** enemies path, take cover, flank, and shoot back with LOS; AI replay tests green; V5 holds with 12 agents; AI rubric criterion ≥3.5 recorded.
+**EXIT GATE P2:** bots path, take cover, flank, and fight using the real player systems; AI replay tests green; V5 holds with 12 bots; AI rubric ≥3.5.
 
 ---
 
-## PHASE 3 — Content & fidelity (`research/02`, `05`, `13`, `14`)
+## PHASE 3 — Game modes & match flow (playable competitive game vs bots)
 
-### Epic 3.A — Asset pipeline
-- [ ] T-301 Blender→glTF pipeline + `gltf-transform`/`gltfpack` optimize step (meshopt/Draco + KTX2) scripted; loaders wired (GLTF/Draco/Meshopt/KTX2). — acceptance: a test GLB loads optimized; size within budget. [V1][V5]
-- [ ] T-302 `public/assets/LICENSES.md` per-asset license ledger; CC0-first policy enforced. — acceptance: every shipped asset has a ledger entry; no NonCommercial. [V1]
-- [ ] T-303 Real animated enemy characters (Mixamo retargeted, baked clips: idle/walk/run/attack/death) replacing placeholders; invisible hitboxes drive gameplay. — acceptance: E2E gameplay unchanged; visual baseline of animated enemy. [V3][V4]
-- [ ] T-304 First-person arms + weapon viewmodels (fire/reload/draw/sprint/inspect clips). — acceptance: visual baselines of each weapon state. [V4]
+- [ ] T-301 Team system (assignment, team colors, friendly-fire config). — acceptance: unit: balanced teams; FF respected. [V2]
+- [ ] T-302 Spawn system: team/zone spawns, spawn protection, anti-spawn-camp selection; S&D no-respawn support. — acceptance: replay: spawns avoid enemies; protection works. [V2]
+- [ ] T-303 Match lifecycle: warmup→live→end→results; score/time limits; restart. — acceptance: E2E: a match runs start→results. [V3]
+- [ ] T-304 Scoreboard (Tab) + killfeed + end-of-match results screen. — acceptance: E2E shows kills/scores. [V3]
+- [ ] T-310 **Mode: Free-for-all** (logic, scoring, win condition). — acceptance: E2E: FFA vs bots reaches a winner. [V3]
+- [ ] T-311 **Mode: Team Deathmatch** (team score race). — acceptance: E2E: TDM vs bots ends on score limit. [V3]
+- [ ] T-312 **Mode: Domination/Hardpoint** (capture/hold points, ticket/score accrual, contest logic). — acceptance: E2E: capturing a point accrues score. [V3]
+- [ ] T-313 **Mode: Search & Destroy** (round-based, no respawn, bomb plant/defuse, attack/defend, first-to-N rounds, round timers). — acceptance: E2E: plant→defuse and plant→detonate both resolve rounds correctly. [V2][V3]
+- [ ] T-314 Mode-objective bot AI: bots understand each mode (chase kills / push+hold points / plant or defuse / play the round) + rotate. — acceptance: replay per mode: bots pursue the objective, not just kills. [V2]
+- [ ] T-315 Per-mode HUD (objective state, team scores, round, timer, bomb status). — acceptance: E2E HUD reflects mode state. [V3]
+- [ ] T-316 Preset **class/loadout select** screen + spawn with chosen loadout (primary/secondary/lethal/tactical). — acceptance: E2E: pick class → spawn with its weapons. [V3]
 
-### Epic 3.B — Rendering fidelity (`research/02`)
-- [ ] T-310 PBR materials + HDRI image-based lighting (PMREM) + ACES/AgX tonemap + LUT color grade. — acceptance: visual baselines; perf within budget. [V4][V5]
-- [ ] T-311 Sun + cascaded shadow maps. — acceptance: visual baseline; V5 budget. [V4][V5]
-- [ ] T-312 Post stack: bloom + GTAO + TAA (+ selective SSR). — acceptance: visual baselines; toggleable via settings; V5 budget. [V4][V5]
-- [ ] T-313 GPU particles + pooled decals at scale. — acceptance: V5: no GC/draw-call blowout under heavy VFX. [V5]
-- [ ] T-314 Instancing/BatchedMesh + LODs + frustum/occlusion culling for the map kit. — acceptance: V5: draw calls <100 in a populated arena. [V5]
-
-### Epic 3.C — Content breadth
-- [ ] T-320 ≥5 tuned weapons (AR/SMG/shotgun/sniper/pistol) incl. projectile path+drop for sniper/launcher. — acceptance: per-weapon replay tests; TTK/recoil match data. [V2]
-- [ ] T-321 ≥3 maps (greybox→art) as data-driven descriptors; varied archetypes (arena, lanes, vertical). — acceptance: each loads, colliders+spawns valid, visual baseline. [V3][V4]
-- [ ] T-322 Dynamic music (vertical layering / stingers) + full mix (buses, ducking, voice budget). — acceptance: E2E: music intensifies in combat; mix doesn't clip. [V3]
-- [ ] T-323 Progression/upgrades persisted (weapon levels, perks). — acceptance: E2E: upgrade persists across waves; save/load round-trips. [V3]
-
-### Epic 3.D — Front-end & options
-- [ ] T-330 Main menu, pause, game-over (best-run save). — acceptance: E2E navigates all screens. [V3]
-- [ ] T-331 Settings: sensitivity, graphics quality toggles (post-fx/shadows/resolution), audio sliders, **rebindable keys**. — acceptance: E2E: changing a setting persists + takes effect. [V3]
-
-**PHASE 3 EXIT GATE:** content-complete v1; visual baselines committed for all weapons/enemies/maps; fidelity+content rubric criteria hit phase targets; verify.sh green.
+**EXIT GATE P3:** all four modes are playable end-to-end vs bots with teams/spawns/scoring/HUD; per-mode E2E tests green; verify.sh green; record rubric self-score (this is the first "real game" milestone).
 
 ---
 
-## PHASE 4 — Polish, performance, ship
+## PHASE 4 — Third-person + character animation
 
-- [ ] T-401 Performance pass to budgets across all maps (instancing/LOD/culling/KTX2/draw-call <100, p95 ≤16.6ms). — acceptance: V5 green on every map under combat load. [V5]
-- [ ] T-402 Memory soak (5-min) leak-free (memlab). — acceptance: V5 soak passes. [V5]
-- [ ] T-403 Balance pass (TTK, enemy difficulty curve, economy) using replay metrics. — acceptance: difficulty curve within design targets; documented. [V2]
-- [ ] T-404 Accessibility + UX polish (FOV slider, colorblind-safe HUD, reduce-shake toggle, subtitles for cues). — acceptance: E2E options present + effective. [V3]
-- [ ] T-405 Full test coverage sweep: every gameplay system has a replay/E2E; visual baselines for all key states; flaky-test audit. — acceptance: coverage thresholds met; V2/V3/V4 green. [V2][V3][V4]
-- [ ] T-406 Final competitor scoring with evidence; record in `COMPETITORS.md`. — acceptance: weighted total > 3.7, feel pillars ≥4.0, none <3.0, each justified. [—]
-- [ ] T-407 Production deploy (Pages) + smoke test the live URL. — acceptance: live build loads + plays; CI deploy green. [V3]
-- [ ] T-408 `README.md` (play + dev + contribute) + final docs pass. — acceptance: docs accurate; links valid. [V1]
+- [ ] T-401 Player character model (Mixamo/CC0) + rig + locomotion blend (idle/walk/run/strafe/crouch/jump/slide). — acceptance: visual baselines of states; deterministic from velocity. [V4]
+- [ ] T-402 Third-person camera (over-shoulder, collision avoidance, aim offset, shoulder swap). — acceptance: E2E TP camera follows + no clip through walls. [V3]
+- [ ] T-403 FP↔TP seamless toggle with **identical hitboxes/gameplay** in both. — acceptance: replay: same shot resolves identically FP vs TP. [V2][V3]
+- [ ] T-404 Weapon handling anims in TP (aim, fire, reload, ADS) + upper/lower body blend. — acceptance: visual baselines; reload duration matches sim. [V4]
+- [ ] T-405 Bots/other players render the same animated character + team skins. — acceptance: visual baseline of an animated bot. [V4]
 
-**PHASE 4 / v1 SHIP GATE:** all tasks `[x]`; all 5 verifiers green; perf budgets met; `COMPETITORS.md` v1 target met; deployed.
+**EXIT GATE P4:** game fully playable in first AND third person with animated characters; hitbox parity proven; visual baselines committed; verify.sh green.
 
 ---
 
-## PHASE 5 — Multiplayer (future / optional; `research/08`)
-> Not required for v1 ship. Only the determinism/sim-split rules from Phase 0 must already hold.
-- [ ] T-501 `Transport` interface + local loopback "fake network" (build/tune ~90% of netcode, no server).
-- [ ] T-502 Authoritative server (Node) running the existing `simulate()` at 30Hz sim / 20Hz snapshot.
-- [ ] T-503 Client prediction + server reconciliation + entity interpolation.
-- [ ] T-504 Lag compensation (server-side hitbox rewind, ~1s ring buffer).
-- [ ] T-505 Snapshot/delta compression; bandwidth budget.
-- [ ] T-506 Matchmaking/rooms (Colyseus) + hosting (Edgegap/Colyseus Cloud).
-- [ ] T-507 WebTransport upgrade behind the Transport interface.
-- [ ] T-508 Server-authority anti-cheat hardening (occlusion-aware state, behavioral checks).
+## PHASE 5 — Vehicles (drive + shoot in maps)
+
+- [ ] T-501 Vehicle physics: Rapier raycast-vehicle car (suspension, steering, accel/brake). — acceptance: replay: deterministic drive over a test surface. [V2]
+- [ ] T-502 Enter/exit + driver control + vehicle camera (FP/TP). — acceptance: E2E enter→drive→exit. [V3]
+- [ ] T-503 Drive + shoot (driver sidearm / passenger seats fire). — acceptance: E2E shoot from vehicle. [V3]
+- [ ] T-504 Vehicle health, collision damage, destruction + explosion (reuse AoE). — acceptance: replay: damage + destroy. [V2]
+- [ ] T-505 Second vehicle type (bike) + vehicle spawns in `*.level.json`. — acceptance: loads in map; both drive. [V3]
+- [ ] T-506 Bots use vehicles to rotate (path + enter + drive to objective). — acceptance: replay: a bot drives to an objective. [V2]
+- [ ] T-507 Vehicle audio (engine, skid, impact, horn). — acceptance: E2E schedules engine audio while driving. [V3]
+
+**EXIT GATE P5:** vehicles are drivable + combat-usable by players and bots in FP/TP; verify.sh green; perf holds with vehicles active.
+
+---
+
+## PHASE 6 — Content & fidelity (go big)
+
+- [ ] T-601 Asset pipeline: Blender→glTF→`gltf-transform`/`gltfpack` (meshopt/Draco + KTX2); loaders wired. — acceptance: a test GLB loads optimized within budget. [V1][V5]
+- [ ] T-602 `public/assets/LICENSES.md` ledger; CC0-only enforced. — acceptance: every asset has an entry; none NonCommercial/paid/AI-gen. [V1]
+- [ ] T-603 **Weapon roster (≥10)** across classes (AR/SMG/LMG/shotgun/sniper/pistol/launcher) tuned + models/viewmodels (CC0/procedural) + anims. — acceptance: per-weapon replay (TTK/recoil) + visual baselines. [V2][V4]
+- [ ] T-604 **Multiple urban maps (≥4)** greybox→art, with per-mode spawns/objectives/bombsites/hardpoints/vehicle spawns. — acceptance: each loads + valid for all supported modes; visual baseline. [V3][V4]
+- [ ] T-605 Character variety + team skins (Mixamo/CC0). — acceptance: visual baselines; license ledger updated. [V4]
+- [ ] T-610 Rendering fidelity: PBR materials + HDRI IBL + ACES/AgX tonemap + LUT. — acceptance: visual baselines; V5 budget. [V4][V5]
+- [ ] T-611 Sun + cascaded shadow maps. — acceptance: visual baseline; budget. [V4][V5]
+- [ ] T-612 Post stack: bloom + GTAO + TAA (+ selective SSR), quality toggles. — acceptance: visual baselines; toggleable; budget. [V4][V5]
+- [ ] T-613 GPU particles + pooled decals at scale; instancing/BatchedMesh + LOD + culling. — acceptance: V5 draw calls <100 in a populated map. [V5]
+- [ ] T-620 Audio full: layered weapons + surface footsteps + vehicles + callouts + ambience + dynamic music + mix/ducking + voice budget. — acceptance: E2E music intensifies in combat; mix doesn't clip. [V3]
+- [ ] T-630 Preset class definitions (loadouts) + simple perks. — acceptance: each class spawns correctly; perks apply (tested). [V2][V3]
+- [ ] T-631 Front-end: main menu + mode select + class select + pause + results. — acceptance: E2E navigates all. [V3]
+- [ ] T-632 Settings: sensitivity, **FP/TP toggle**, graphics quality, audio sliders, **rebindable keys**; persisted. — acceptance: E2E change persists + takes effect. [V3]
+
+**EXIT GATE P6:** content-complete (≥10 weapons, ≥4 maps, characters, all modes, vehicles, classes, menus); visual baselines committed; fidelity+content rubric targets hit; verify.sh green.
+
+---
+
+## PHASE 7 — Polish, performance, balance, ship
+
+- [ ] T-701 Performance pass to budgets across all maps/modes/vehicles (draw calls <100, p95 ≤16.6ms). — acceptance: V5 green everywhere under combat load. [V5]
+- [ ] T-702 Memory soak (5-min match) leak-free (memlab). — acceptance: V5 soak passes. [V5]
+- [ ] T-703 Balance pass (TTK, weapon/class balance, mode pacing, bot difficulty) via replay metrics. — acceptance: documented targets met. [V2]
+- [ ] T-704 Accessibility + UX polish (FOV slider, colorblind-safe HUD, reduce-shake, subtitles/callout text, aim-assist option). — acceptance: E2E options present + effective. [V3]
+- [ ] T-705 Full test coverage sweep: every system has replay/E2E; visual baselines for all key states; flaky-test audit. — acceptance: coverage thresholds; V2/V3/V4 green. [V2][V3][V4]
+- [ ] T-706 Final competitor scoring with evidence in `COMPETITORS.md`. — acceptance: weighted total > 3.7; feel pillars ≥4.0; none <3.0; justified. [—]
+- [ ] T-707 Production deploy (Pages) + live smoke test. — acceptance: live build loads + a full match vs bots plays. [V3]
+- [ ] T-708 `README.md` (play/dev/contribute) + final docs pass. — acceptance: accurate; links valid. [V1]
+
+**v1 SHIP GATE:** all Phase 0–7 tasks `[x]`; all five verifiers green; perf budgets met; `COMPETITORS.md` v1 target met; deployed. Matches `GAME_DESIGN.md §7`.
+
+---
+
+## PHASE 8 — Online multiplayer (deferred; `research/08`)
+> Not required for v1. Only the determinism/sim-split rules must already hold (they do from P0).
+- [ ] T-801 `Transport` interface + local loopback "fake network" (validate netcode w/o a server).
+- [ ] T-802 Authoritative Node server running the existing `simulate()` (30Hz sim / 20Hz snapshot).
+- [ ] T-803 Client prediction + server reconciliation + entity interpolation.
+- [ ] T-804 Lag compensation (server hitbox rewind, ~1s ring buffer).
+- [ ] T-805 Snapshot/delta compression + bandwidth budget.
+- [ ] T-806 Matchmaking/rooms (Colyseus) + hosting; fill empty slots with the existing bots.
+- [ ] T-807 WebTransport upgrade behind the Transport interface.
+- [ ] T-808 Server-authority anti-cheat hardening.
 
 ---
 
 ## Progress
-- Phase 0: 0/14 · Phase 1: 0/19 · Phase 2: 0/19 · Phase 3: 0/16 · Phase 4: 0/8 · Phase 5: 0/8 (deferred)
-- Update these counts whenever a box is flipped. The build is **not** done until Phases 0–4 are
-  fully `[x]` and the v1 ship gate passes (`GOAL.md`).
+- P0: 0/19 · P1: 0/22 · P2: 0/10 · P3: 0/14 · P4: 0/5 · P5: 0/7 · P6: 0/16 · P7: 0/8 · P8: 0/8 (deferred)
+- Update counts as boxes flip. v1 is done when **P0–P7 are fully `[x]`** and the v1 ship gate passes (`GOAL.md`).

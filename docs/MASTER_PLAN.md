@@ -1,8 +1,10 @@
 # NEON BREACH — Master Plan
 
-> The single source of truth for building a browser-based, headline-quality first-person
-> shooter the right way. This document defines **what** we are building, **why**, the
-> **tech**, the **roadmap**, and the **quality bar**. It is paired with:
+> The plan for building a browser-based, headline-quality shooter the right way: **tech**,
+> **roadmap**, and **quality bar**. The **game vision is defined authoritatively in
+> `docs/GAME_DESIGN.md`** (read that first — where it and this doc disagree, GAME_DESIGN wins).
+> This document is paired with:
+> - `docs/GAME_DESIGN.md` — the locked creative + scope spec (what the game IS).
 > - `docs/TASKS.md` — the machine-checkable backlog the build executes against (the checklist `/goal` knocks off).
 > - `docs/VERIFICATION.md` — how every build is objectively verified + the competitor rubric.
 > - `docs/ARCHITECTURE.md` — the code architecture and source tree.
@@ -15,9 +17,11 @@
 
 ## 1. North Star
 
-**Build the best-feeling first-person shooter that runs in a browser tab — a single-player,
-round-based survival FPS with AAA-grade *game feel*, verified objectively against headline
-shooters.**
+**Build the best-feeling competitive shooter that runs in a browser tab — a CoD-style,
+arcade-fast, first/third-person multi-mode shooter (FFA / TDM / Domination / Search & Destroy)
+in GTA-flavored urban maps with drivable vehicles, fought against smart bots and architected for
+online multiplayer later — with AAA-grade *game feel*, verified objectively against headline
+shooters.** (Full spec: `docs/GAME_DESIGN.md`.)
 
 We optimize for the dimensions the web can actually win (gunplay, movement, feedback/juice,
 audio, performance — ~56–62% of the quality rubric in `research/01`) and are deliberate and
@@ -50,34 +54,29 @@ against the headline-shooter rubric and push every winnable category to the top 
 
 ## 3. What we are building (v1 game definition)
 
-**Title:** NEON BREACH
-**Genre:** Single-player, round-based **wave-survival** FPS (CoD-Zombies / Killing-Floor lineage —
-the mode that best fits a single-file→web build with no netcode; see `research/01`, `research/11`).
-**Core loop:** Drop into an arena → survive escalating waves of AI that hunt you and **use cover
-and shoot back** → earn score/currency on kills → spend between waves on weapons/ammo/upgrades →
-survive as long as possible; leaderboard by wave + score.
-**Player fantasy:** Precise, weighty, responsive gunplay; smart enemies; satisfying feedback.
-**Platforms:** Desktop browsers first (Chrome/Edge/Firefox/Safari 26+), keyboard + mouse.
-Mobile/touch is a non-goal for v1 (perf + controls).
+**The authoritative spec is `docs/GAME_DESIGN.md`.** In brief:
 
-### v1 feature set (the definition of "done enough to be great")
-- Tight FPS controller: accel/friction movement, sprint, crouch, jump, slide, auto-mantle.
-- Data-driven weapons (≥5: AR, SMG, shotgun, sniper, pistol) with two-layer recoil, first-shot
-  accuracy + bloom, ADS (correct sens scaling), reload, ammo/reserve, weapon switching.
-- Full combat juice: hitmarkers, headshots, trauma screenshake, hitstop, muzzle flash, tracers,
-  impact decals/particles, layered spatial audio.
-- Smart enemies: Behavior-Tree + utility AI, navmesh movement, perception/awareness states,
-  cover use, flanking, ranged fire with line-of-sight, fair difficulty scaling; ≥4 archetypes.
-- Wave director with intensity pacing (build→peak→fade→relax), spawn rules, between-wave economy.
-- ≥3 maps built from modular CC0 kits (greybox→art pass), data-driven level descriptors.
-- Real assets: Mixamo-animated enemy characters, first-person weapon viewmodels, PBR materials,
-  HDRI lighting, KTX2/meshopt-optimized.
-- Rendering: WebGPU (WebGL2 fallback), PBR + IBL + CSM shadows + post stack (bloom, GTAO, TAA,
-  tonemap, color grade), GPU particles.
-- HUD/menus: main menu, settings (sensitivity, graphics, audio, keybinds), pause, game-over,
-  save of best run.
-- Audio: spatial weapon/footstep/impact/enemy/ambient SFX + dynamic music + mix/ducking.
-- Performance: 60fps desktop within budgets (`research/02`, `VERIFICATION.md`).
+**Title:** NEON BREACH — an arcade-fast **competitive shooter** with CoD-style gunplay in
+**GTA-flavored urban maps**, **first/third-person switchable**, with **drivable vehicles**, across
+four modes (**FFA, TDM, Domination/Hardpoint, Search & Destroy**), fought **vs smart bots** that
+play like real opponents. Free/CC0 assets. **Online multiplayer is architected-for but deferred to
+Phase 8.** Scope = **go big**, finished and **verified done**.
+**Platforms:** desktop browsers (Chrome/Edge/Firefox/Safari 26+), keyboard + mouse.
+
+### v1 feature set (high level — full detail in `GAME_DESIGN.md`, decomposed in `TASKS.md`)
+- Tight controller with the **full arcade movement kit**: accel/friction, sprint, tac-sprint,
+  slide, vault/mantle, crouch, jump.
+- **First- and third-person** (switchable) with animated characters; identical hitboxes/gameplay.
+- CoD-feel gunplay (two-layer recoil, first-shot accuracy + bloom, ADS, hitscan + projectile),
+  large weapon roster (≥10), **preset class loadouts** (XP/unlocks deferred).
+- Smart **bots** that drive the same player systems and play each mode's objective (cover, flank,
+  rotate, plant/defuse/hold) with fair difficulty.
+- **Four modes** with teams, spawning/respawn, scoring, scoreboard, killfeed, per-mode HUD.
+- **Vehicles** (car + bike) drivable + combat-usable by players and bots.
+- **Multiple urban maps** (≥4) from CC0 kits (greybox→art), data-driven descriptors.
+- Full juice + spatial audio + dynamic music; WebGPU rendering (PBR/IBL/CSM/post stack); menus +
+  settings (incl. FP/TP toggle + rebindable keys).
+- 60fps desktop within budgets (`VERIFICATION.md`).
 
 ---
 
@@ -96,7 +95,7 @@ Decisions synthesized from the research; rationale + source in parentheses.
 | AI nav | **recast-navigation-js** (navmesh + crowd); **Yuka** for fast-start perception/steering | Mature WASM Recast/Detour; crowd fixes clumping (`research/04`) |
 | AI decisions | **Behavior Tree + Blackboard + utility scorer** (hand-rolled BT core) | Proven AAA pattern, debuggable (`research/04`) |
 | Audio | **Howler.js** + thin raw Web Audio layer (occlusion/reverb/ducking) | Cross-browser, HRTF spatial, pooling (`research/06`) |
-| Assets | **GLB + meshopt + KTX2**; CC0 kits (Kenney/Quaternius/KayKit), Poly Haven/ambientCG textures/HDRIs, **Mixamo** anims | Commercial-safe, web-optimized (`research/05`, `research/13`, `research/14`) |
+| Assets | **GLB + meshopt + KTX2**; CC0 kits (Kenney/Quaternius/KayKit), Poly Haven/ambientCG textures/HDRIs, **Mixamo** anims | Commercial-safe, web-optimized (`research/05`, `research/13`, `research/14`). **Locked v1 policy: free / CC0 only — no paid or AI-generated assets** |
 | Testing | **Vitest + fast-check** (logic/replay), **Playwright** (E2E + visual), perf probes + Lighthouse CI | Objective, automatable verification (`research/07`) |
 | CI/CD | **GitHub Actions** → build/lint/test/perf gate → **GitHub Pages** deploy | One required `ci-passed` gate (`research/07`, `research/09`) |
 | Multiplayer (deferred) | architect for it: pure `simulate(state, command, dt)`; later WebSocket→WebTransport + Colyseus | Pre-pay architecture, defer cost (`research/08`) |
@@ -144,48 +143,39 @@ Full detail in `docs/VERIFICATION.md` + `docs/COMPETITORS.md`.
 Each phase is a set of epics; each epic decomposes into checkbox tasks in `TASKS.md`. A phase is
 complete only when all its tasks are checked **and** its exit gate passes.
 
-### Phase 0 — Foundation & verification harness
-Scaffolding (Vite/TS/lint), CI + Pages deploy, the 5-verifier `verify.sh`, deterministic engine
-core (fixed loop, seeded RNG, miniplex, event bus, sim/presentation split, `hashWorld`), the
-test-instrumentation contract (`__GAME_READY__`, `__GAME_STATE__`, `__perf`, `__pushCommand`,
-`__stepTo`, `?seed/?scenario`), and a "hello cube" rendered + a passing replay test.
-**Exit gate:** `verify.sh` green on an empty-but-real game; CI green; deployed to Pages.
+Full task-level detail is in `docs/TASKS.md` (this is the summary; the build is sequenced so a
+**playable competitive game vs bots exists by end of Phase 3**, then expands).
 
-### Phase 1 — Core FPS vertical slice (the feel)
-Renderer bootstrap (WebGPU/WebGL2, PBR/IBL/tonemap/shadows); kinematic capsule controller +
-movement; pointer-lock look with correct ADS sens scaling; data-driven weapon system (1 weapon
-first) with two-layer recoil, bloom/first-shot accuracy, ADS, reload; full juice (hitmarkers,
-screenshake, hitstop, muzzle/tracers/decals); one enemy + spawn + a basic wave loop; HUD; core
-audio. Built on greybox "Arena 01".
-**Exit gate:** a player can fight a wave and it *feels* good; gunplay/movement params match the
-`research/03` spec; verifiers green incl. a replay test of a scripted firefight; rubric self-score
-recorded.
-
-### Phase 2 — AI & encounter depth
-BT + blackboard + utility AI; navmesh (recast) + crowd; perception + awareness states + LKP;
-combat behaviors (cover, peek-fire, flank, suppress, retreat, grenades); ≥4 enemy archetypes;
-fair difficulty scaling; wave director with intensity pacing; player grenades + 1 killstreak.
-**Exit gate:** enemies demonstrably path, take cover, flank, and shoot back with LOS; AI replay
-tests pass; AI rubric criterion ≥ best-web baseline.
-
-### Phase 3 — Content & fidelity
-Asset pipeline (Blender→glTF→optimize); real animated enemy characters (Mixamo) + FP viewmodels;
-≥5 tuned weapons; ≥3 maps (greybox→art); full post-processing realism stack; VFX + viewmodel/enemy
-animation; dynamic music + full mix; economy/upgrades; menus/settings/keybinds/save.
-**Exit gate:** content-complete v1; visual baselines committed; rubric fidelity + content criteria
-hit phase targets.
-
-### Phase 4 — Polish, performance, ship
-Optimize to perf budgets (instancing, LOD, culling, KTX2, draw-call <100 target); UX/accessibility
-polish; balance pass; full test coverage + visual baselines + perf gates green; final competitor
-scoring; production deploy.
-**Exit gate (v1 ship):** all `TASKS.md` checked; all 5 verifiers green; perf budgets met; overall
-rubric score **> best-web-FPS reference and ≥ target on each feel pillar.**
-
-### Phase 5 — Multiplayer (future / optional)
-Transport interface → loopback "fake net" → authoritative WS server (30Hz sim/20Hz snapshot) +
-prediction/reconciliation/interpolation/lag-comp → WebTransport upgrade + anti-cheat hardening
-(`research/08`). Not required for v1 ship.
+- **Phase 0 — Foundation & verification.** Vite/TS/lint scaffold, CI + Pages, the 5-verifier
+  `verify.sh`, deterministic engine core (fixed loop, seeded RNG, miniplex, sim/presentation
+  split, `hashWorld`), instrumentation contract, renderer bootstrap. *Exit:* verify.sh green on a
+  minimal real app; CI green; deployed.
+- **Phase 1 — Core first-person feel.** Capsule controller + **full movement kit** (sprint/
+  tac-sprint/slide/mantle/crouch/jump); CoD-feel gunplay (two-layer recoil, bloom, ADS, reload);
+  full juice; HUD + audio core; greybox urban map; shootable bot stub. *Exit:* moving+shooting in
+  FP feels good; params match `research/03`; verify.sh green.
+- **Phase 2 — Combat AI & bots.** BT + utility + navmesh/crowd + perception/awareness; bots drive
+  the **same player systems**; cover/flank/peek/grenades; fair difficulty; AI LOD. *Exit:* bots
+  fight like players; AI replay green; V5 holds with 12 bots.
+- **Phase 3 — Game modes & match flow.** Teams/spawns/respawn/scoring/scoreboard/killfeed;
+  **FFA → TDM → Domination → Search & Destroy** vs bots; mode-objective bot AI; per-mode HUD;
+  preset class/loadout select. *Exit:* all four modes playable end-to-end vs bots (first real-game
+  milestone).
+- **Phase 4 — Third-person + character animation.** Animated player body + locomotion blend, TP
+  camera, seamless FP↔TP with hitbox parity, weapon anims, animated bots. *Exit:* fully playable
+  in FP and TP.
+- **Phase 5 — Vehicles.** Rapier vehicle (car + bike), enter/exit, drive+shoot, vehicle combat/
+  destruction, bots use vehicles, vehicle audio. *Exit:* vehicles usable by players + bots.
+- **Phase 6 — Content & fidelity (go big).** Asset pipeline; **≥10 weapons**; **≥4 urban maps**;
+  characters/skins; rendering post stack (PBR/IBL/CSM/bloom/GTAO/TAA); full audio + music; preset
+  classes; menus/settings (incl. FP/TP toggle + keybinds). *Exit:* content-complete; baselines
+  committed; fidelity/content targets hit.
+- **Phase 7 — Polish, performance, balance, ship.** Perf to budgets; memory soak; balance; full
+  coverage; final competitor scoring; production deploy. *Exit (v1 ship):* all P0–P7 tasks `[x]`;
+  5 verifiers green; perf met; rubric **> 3.7 with feel pillars ≥ 4.0**.
+- **Phase 8 — Online multiplayer (deferred).** Transport → loopback → authoritative server →
+  prediction/reconciliation/interpolation/lag-comp → matchmaking → WebTransport → anti-cheat
+  (`research/08`). Not required for v1; architecture pre-pays for it.
 
 ---
 
@@ -200,7 +190,8 @@ prediction/reconciliation/interpolation/lag-comp → WebTransport upgrade + anti
 | Headless WebGL/visual-test flakiness | Pinned Playwright Docker image; frozen deterministic frames; `maxDiffPixelRatio`; baselines reviewed, never auto-updated (`research/07`) |
 | Asset licensing | CC0-first; per-asset license ledger; never NonCommercial; Mixamo incorporated not redistributed (`research/05`, `research/13`) |
 | `/goal` releases before completion (8-block override) | Each turn makes committed progress; re-run the same goal to continue; optionally `/loop` it (`WORKFLOW.md`) |
-| Scope creep | v1 feature set in §3 is the contract; multiplayer + extras are Phase 5+ |
+| Scope creep | `GAME_DESIGN.md` is the contract; online MP + create-a-class/XP are Phase 8 / deferred |
+| Big scope ("go big") may not finish in one run | Sequenced for a playable game by end of P3; commit per task; re-run/`/loop` the goal; progress persists |
 
 ---
 
