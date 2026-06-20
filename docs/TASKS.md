@@ -41,10 +41,10 @@
 - [x] T-102 Ground movement: accel + friction (counter-strafe), per-weapon move mult. — acceptance: replay reproduces position curve; params per `research/03`. [V2] — 2b7fbb3 (per-weapon moveMult; counter-strafe proven; movement.test.ts goldens f1ea305f/15fd117c/31a3a3a9/93681d27; reviewer APPROVED after 1 fix round)
 - [x] T-103 Sprint + **tactical sprint** + sprint-to-fire delay. — acceptance: E2E: fire blocked during sprint-out window. [V3] — b784a19 (reviewer APPROVED)
 - [x] T-104 Crouch + jump (gravity ~18–25 m/s²). — acceptance: replay-stable heights. [V2] — efd9476 (reviewer APPROVED)
-- [ ] T-105 **Slide** (momentum, duration, slow-down) + **vault/mantle** (auto over ~1–1.3 m). — acceptance: E2E slide over distance + mantle a ledge; replay-stable. [V2][V3]
+- [x] T-105 **Slide** (momentum, duration, slow-down) + **vault/mantle** (auto over ~1–1.3 m). — acceptance: E2E slide over distance + mantle a ledge; replay-stable. [V2][V3] — 15620cf (reviewer APPROVED)
 - [ ] T-106 Pointer-lock look: raw mouse (no accel), sensitivity DPI/cm-360/eDPI. — acceptance: input→yaw/pitch deterministic. [V2]
 - [x] T-110 Data-driven weapon schema (single source of truth). — acceptance: schema validated; AR loads from data. [V1][V2] — efd9476 (reviewer APPROVED)
-- [ ] T-111 Hitscan + region hitboxes (head/chest/limb) + multipliers (head ×1.4–1.6, limb ×0.8–0.9). — acceptance: replay damage by region. [V2]
+- [x] T-111 Hitscan + region hitboxes (head/chest/limb) + multipliers (head ×1.4–1.6, limb ×0.8–0.9). — acceptance: replay damage by region. [V2] — 15620cf (reviewer APPROVED)
 - [ ] T-112 Two-layer recoil (fixed pattern moves bullets + recovering visual kick). — acceptance: replay N-round pattern; tunable recovery. [V2]
 - [ ] T-113 Accuracy: first-shot accurate + movement/stance/fire bloom; dynamic crosshair. — acceptance: replay spread states; E2E crosshair bloom. [V2][V3]
 - [ ] T-114 ADS: FOV lerp + viewmodel to sights + correct ADS sens scaling. — acceptance: unit test scaling math; E2E ADS FOV. [V2][V3]
@@ -54,7 +54,7 @@
 - [ ] T-121 Trauma screenshake + 30–80ms hitstop. — acceptance: deterministic; visible in state. [V2][V3]
 - [ ] T-122 Pooled muzzle flash + tracers + impact decals + particles. — acceptance: V5 no GC spikes sustained fire; visual baseline. [V4][V5]
 - [ ] T-123 FP viewmodel: idle sway + bob + ADS pose + fire kick (frame-rate independent). — acceptance: visual baselines; deterministic poses. [V4]
-- [ ] T-130 HUD core: health, ammo/reserve, dynamic crosshair. — acceptance: E2E reads `__GAME_STATE__` matches HUD. [V3]
+- [x] T-130 HUD core: health, ammo/reserve, dynamic crosshair. — acceptance: E2E reads `__GAME_STATE__` matches HUD. [V3] — 15620cf (reviewer APPROVED)
 - [ ] T-131 Audio core: Howler + spatial listener; weapon fire (layered), footsteps, impacts; AudioContext unlock. — acceptance: E2E fire schedules audio; no errors. [V3]
 - [x] T-132 Greybox urban test map (CC0 kit) + `*.level.json` (bounds/cover/spawns). — acceptance: loads; collider present; spawns valid. [V2][V3] — efd9476 (reviewer APPROVED)
 - [ ] T-133 Shootable bot stub (placeholder target with health). — acceptance: replay: shots kill it; respawns. [V2]
@@ -173,5 +173,5 @@
 ---
 
 ## Progress
-- P0: 18/19 (T-005 awaiting CI-green confirmation) · P1: 6/22 (T-101..T-104, T-110, T-132) · P2: 0/10 · P3: 0/14 · P4: 0/5 · P5: 0/7 · P6: 0/16 · P7: 0/8 · P8: 0/8 (deferred)
+- P0: 18/19 (T-005 awaiting CI-green confirmation) · P1: 9/22 (T-101..T-105, T-110, T-111, T-130, T-132) · P2: 0/10 · P3: 0/14 · P4: 0/5 · P5: 0/7 · P6: 0/16 · P7: 0/8 · P8: 0/8 (deferred)
 - Update counts as boxes flip. v1 is done when **P0–P7 are fully `[x]`** and the v1 ship gate passes (`GOAL.md`).
