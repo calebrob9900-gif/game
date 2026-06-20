@@ -70,6 +70,15 @@ function foldEntity(h: number, e: Entity): number {
   if (e.isMantling !== undefined) h = foldStr(h, e.isMantling ? 'ML' : 'ml');
   if (e.mantleTicksLeft !== undefined && e.mantleTicksLeft > 0)
     h = foldNumber(h, e.mantleTicksLeft);
+  // --- bot stub (T-133) — bot fields hashed only when present so existing goldens unchanged ---
+  if (e.bot) {
+    h = foldStr(h, 'BOT');
+    // damageable: hash the alive/dead state
+    h = foldStr(h, e.damageable ? 'alive' : 'dead');
+    // respawnAtTick: hash only when a respawn is scheduled (non-zero)
+    if (e.respawnAtTick !== undefined && e.respawnAtTick > 0) h = foldNumber(h, e.respawnAtTick);
+  }
+  // --- end bot stub hash ---
   return h;
 }
 
