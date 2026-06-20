@@ -42,22 +42,22 @@
 - [x] T-103 Sprint + **tactical sprint** + sprint-to-fire delay. — acceptance: E2E: fire blocked during sprint-out window. [V3] — b784a19 (reviewer APPROVED)
 - [x] T-104 Crouch + jump (gravity ~18–25 m/s²). — acceptance: replay-stable heights. [V2] — efd9476 (reviewer APPROVED)
 - [x] T-105 **Slide** (momentum, duration, slow-down) + **vault/mantle** (auto over ~1–1.3 m). — acceptance: E2E slide over distance + mantle a ledge; replay-stable. [V2][V3] — 15620cf (reviewer APPROVED)
-- [ ] T-106 Pointer-lock look: raw mouse (no accel), sensitivity DPI/cm-360/eDPI. — acceptance: input→yaw/pitch deterministic. [V2]
+- [x] T-106 Pointer-lock look: raw mouse (no accel), sensitivity DPI/cm-360/eDPI. — acceptance: input→yaw/pitch deterministic. [V2] — 85ad9bb (Source-formula cm360/eDPI/DPI verified; raw movementX/Y, no accel; reviewer APPROVED. follow-up: pin a literal golden in look.test.ts)
 - [x] T-110 Data-driven weapon schema (single source of truth). — acceptance: schema validated; AR loads from data. [V1][V2] — efd9476 (reviewer APPROVED)
 - [x] T-111 Hitscan + region hitboxes (head/chest/limb) + multipliers (head ×1.4–1.6, limb ×0.8–0.9). — acceptance: replay damage by region. [V2] — 15620cf (reviewer APPROVED)
-- [ ] T-112 Two-layer recoil (fixed pattern moves bullets + recovering visual kick). — acceptance: replay N-round pattern; tunable recovery. [V2]
+- [x] T-112 Two-layer recoil (fixed pattern moves bullets + recovering visual kick). — acceptance: replay N-round pattern; tunable recovery. [V2] — 751ea2c (aim recoil offsets bullets; visual kick recovers independently; tunable recovery; goldens 7791f4b2/f6e051f8; reviewer APPROVED)
 - [ ] T-113 Accuracy: first-shot accurate + movement/stance/fire bloom; dynamic crosshair. — acceptance: replay spread states; E2E crosshair bloom. [V2][V3]
 - [ ] T-114 ADS: FOV lerp + viewmodel to sights + correct ADS sens scaling. — acceptance: unit test scaling math; E2E ADS FOV. [V2][V3]
 - [ ] T-115 Reload (timed, reserve, cancel) + ammo + weapon switch (swap lockout). — acceptance: E2E flows. [V3]
 - [ ] T-116 Damage & TTK tuning (fast readable ~0.25–0.6s) + falloff. — acceptance: replay TTK in band. [V2]
-- [ ] T-120 Juice: hitmarkers (normal/head/kill). — acceptance: E2E class changes on headshot. [V3]
+- [x] T-120 Juice: hitmarkers (normal/head/kill). — acceptance: E2E class changes on headshot. [V3] — cb0306f (kill>head>normal variant logic; E2E asserts __lastHitmarker per region; reviewer APPROVED)
 - [ ] T-121 Trauma screenshake + 30–80ms hitstop. — acceptance: deterministic; visible in state. [V2][V3]
 - [ ] T-122 Pooled muzzle flash + tracers + impact decals + particles. — acceptance: V5 no GC spikes sustained fire; visual baseline. [V4][V5]
 - [ ] T-123 FP viewmodel: idle sway + bob + ADS pose + fire kick (frame-rate independent). — acceptance: visual baselines; deterministic poses. [V4]
 - [x] T-130 HUD core: health, ammo/reserve, dynamic crosshair. — acceptance: E2E reads `__GAME_STATE__` matches HUD. [V3] — 15620cf (reviewer APPROVED)
-- [ ] T-131 Audio core: Howler + spatial listener; weapon fire (layered), footsteps, impacts; AudioContext unlock. — acceptance: E2E fire schedules audio; no errors. [V3]
+- [!] T-131 Audio core: Howler + spatial listener; weapon fire (layered), footsteps, impacts; AudioContext unlock. — acceptance: E2E fire schedules audio; no errors. [V3] — 3ef2c4f (code works in a real browser: layered fire/footstep/impact + spatial listener + gesture unlock). reviewer REQUEST-CHANGES: the E2E scheduling assertion is tautological because AudioContext stays suspended under headless SwiftShader (count never increments), so a dead AudioManager wouldn't be caught. PENDING: mock a running AudioContext (addInitScript) OR count on schedule-decision before the ctx.state gate, then assert countAfter > countBefore. NOT counted as done.
 - [x] T-132 Greybox urban test map (CC0 kit) + `*.level.json` (bounds/cover/spawns). — acceptance: loads; collider present; spawns valid. [V2][V3] — efd9476 (reviewer APPROVED)
-- [ ] T-133 Shootable bot stub (placeholder target with health). — acceptance: replay: shots kill it; respawns. [V2]
+- [x] T-133 Shootable bot stub (placeholder target with health). — acceptance: replay: shots kill it; respawns. [V2] — a615feb (spawnBot + RESPAWN_TICKS=300; respawn timing verified; golden 00012d45; reviewer APPROVED. follow-up: hitscan.ts should skip e.damageable===false so a corpse stops emitting lethal hits — bundle with T-116)
 
 **EXIT GATE P1:** a player can move (full kit) and shoot in FP and it feels good; gunplay/movement match `research/03`; ≥1 firefight replay test; verify.sh green; record P1 rubric self-score.
 
@@ -173,5 +173,6 @@
 ---
 
 ## Progress
-- P0: 19/19 ✓ (CI green, run #15) · P1: 9/22 (T-101..T-105, T-110, T-111, T-130, T-132) · P2: 0/10 · P3: 0/14 · P4: 0/5 · P5: 0/7 · P6: 0/16 · P7: 0/8 · P8: 0/8 (deferred)
+- P0: 19/19 ✓ (CI green, run #15) · P1: 13/22 (T-101..T-106, T-110, T-111, T-112, T-120, T-130, T-132, T-133; T-131 [!] code-done, E2E test hardening pending) · P2: 0/10 · P3: 0/14 · P4: 0/5 · P5: 0/7 · P6: 0/16 · P7: 0/8 · P8: 0/8 (deferred)
+- In flight (WIP preserved on worktree branches, not yet verified/integrated): T-116 TTK+falloff (2fa98bd), T-122 pooled VFX (b18754f).
 - Update counts as boxes flip. v1 is done when **P0–P7 are fully `[x]`** and the v1 ship gate passes (`GOAL.md`).
